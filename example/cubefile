@@ -1,0 +1,24 @@
+rule all test
+
+OBJ = [test.o foo.o bar.o]
+
+rule test $OBJ [
+    echo " LD" $target
+    shell cc -o $target $sources
+]
+
+rule %.o %.c [
+    echo " CC" $target
+    shell cc -c -o $target $source
+]
+
+rule clean [] [
+    echo " CLEAN" $OBJ test
+    shell rm -f $OBJ test
+]
+
+// dependencies
+
+rule foo.o foo.h
+rule bar.o bar.h
+rule test.o [foo.h bar.h]

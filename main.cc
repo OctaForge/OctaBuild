@@ -1,8 +1,10 @@
 #include <sys/stat.h>
 
+#include <ostd/types.hh>
+#include <ostd/string.hh>
 #include <ostd/vector.hh>
 
-#include "cubescript.hh"
+#include <cubescript.hh>
 
 struct Rule {
     ostd::String target;
@@ -16,48 +18,64 @@ struct Rule {
     ~Rule() { cscript::bcode_unref(func); }
 };
 
+struct ObState {
+    cscript::CsState cs;
+    ostd::ConstCharRange progname;
+};
+
 ostd::Vector<Rule> rules;
 
-time_t get_file_ts(const char *fname) {
+static time_t ob_get_file_ts(const char *fname) {
     struct stat st;
     if (stat(fname, &st) < 0) return 0;
     return st.st_mtime;
 }
 
-bool check_ts(ostd::ConstCharRange tname,
-              const ostd::Vector<ostd::String> &deps) {
-    time_t tts = get_file_ts(tname.data());
+static bool ob_check_ts(ostd::ConstCharRange tname,
+                        const ostd::Vector<ostd::String> &deps) {
+    time_t tts = ob_get_file_ts(tname.data());
     if (!tts) return true;
     for (auto &dep: deps.iter()) {
-        time_t sts = get_file_ts(dep.data());
+        time_t sts = ob_get_file_ts(dep.data());
         if (sts && tts < sts) return true;
     }
     return false;
 }
 
-bool check_exec(ostd::ConstCharRange tname,
-                const ostd::Vector<ostd::String> &deps) {
-    ostd::FileStream f(tname, ostd::StreamMode::read);
-    if (!f.is_open()) return true;
-    f.close();
-    for (auto &dep: deps.iter()) {
-        f.open(dep, ostd::StreamMode::read);
-        if (!f.is_open()) return true;
-        f.close();
-    }
-    return check_ts(tname, deps);
+static bool ob_check_file(ostd::ConstCharRange fname) {
+    return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
-int exec(cscript::CsState &cs, ostd::ConstCharRange target);
+static bool ob_check_exec(ostd::ConstCharRange tname,
+                          const ostd::Vector<ostd::String> &deps) {
+    if (!ob_check_file(tname))
+        return true;
+    for (auto &dep: deps.iter())
+        if (!ob_check_file(dep))
+            return true;
+    return ob_check_ts(tname, deps);
+}
+
+template<typename ...A>
+static int ob_error(ObState &os, int retcode, ostd::ConstCharRange fmt,
+                    A &&...args) {
+    ostd::err.write(os.progname, ": ");
+    ostd::err.writefln(fmt, ostd::forward<A>(args)...);
+    return retcode;
+}
+
+static int ob_exec_rule(ObState &os, ostd::ConstCharRange target,
+                        ostd::ConstCharRange from = ostd::ConstCharRange());
 
 struct SubRule {
     ostd::ConstCharRange sub;
     Rule *rule;
 };
 
-int exec_list(cscript::CsState &cs,
-              const ostd::Vector<SubRule> &rlist,
-              ostd::Vector<ostd::String> &subdeps) {
+static int ob_exec_rlist(ObState &os,
+                         const ostd::Vector<SubRule> &rlist,
+                         ostd::Vector<ostd::String> &subdeps,
+                         ostd::ConstCharRange tname) {
     ostd::String repd;
     for (auto &sr: rlist.iter()) for (auto &target: sr.rule->deps.iter()) {
         ostd::ConstCharRange atgt = target.iter();
@@ -71,41 +89,39 @@ int exec_list(cscript::CsState &cs,
             atgt = repd.iter();
         }
         subdeps.push(atgt);
-        int r = exec(cs, atgt);
+        int r = ob_exec_rule(os, atgt, tname);
         if (r) return r;
     }
     return 0;
 }
 
-int exec_func(cscript::CsState &cs, ostd::ConstCharRange tname,
-              const ostd::Vector<SubRule> &rlist) {
+static int ob_exec_func(ObState &os, ostd::ConstCharRange tname,
+                        const ostd::Vector<SubRule> &rlist) {
     ostd::Vector<ostd::String> subdeps;
-    int r = exec_list(cs, rlist, subdeps);
-    if (check_exec(tname, subdeps)) {
+    int r = ob_exec_rlist(os, rlist, subdeps, tname);
+    if (ob_check_exec(tname, subdeps)) {
         if (r) return r;
         ostd::Uint32 *func = nullptr;
         for (auto &sr: rlist.iter()) {
             Rule &r = *sr.rule;
             if (!r.func)
                 continue;
-            if (func) {
-                ostd::err.writefln("redefinition of rule '%s'", tname);
-                return 1;
-            }
+            if (func)
+                return ob_error(os, 1, "redefinition of rule '%s'", tname);
             func = r.func;
         }
         if (func) {
             cscript::StackedValue targetv, sourcev, sourcesv;
 
-            targetv.id = cs.new_ident("target");
+            targetv.id = os.cs.new_ident("target");
             if (!cscript::check_alias(targetv.id))
                 return 1;
             targetv.set_cstr(tname);
             targetv.push();
 
             if (subdeps.size() > 0) {
-                sourcev.id = cs.new_ident("source");
-                sourcesv.id = cs.new_ident("sources");
+                sourcev.id = os.cs.new_ident("source");
+                sourcesv.id = os.cs.new_ident("sources");
                 if (!cscript::check_alias(sourcev.id))
                     return 1;
                 if (!cscript::check_alias(sourcesv.id))
@@ -121,14 +137,14 @@ int exec_func(cscript::CsState &cs, ostd::ConstCharRange tname,
                 sourcesv.push();
             }
 
-            return cs.run_int(func);
+            return os.cs.run_int(func);
         }
     }
     return 0;
 }
 
-ostd::ConstCharRange compare_subst(ostd::ConstCharRange expanded,
-                                   ostd::ConstCharRange toexpand) {
+static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
+                                             ostd::ConstCharRange toexpand) {
     auto rep = ostd::find(toexpand, '%');
     /* no subst found */
     if (rep.empty())
@@ -157,26 +173,35 @@ ostd::ConstCharRange compare_subst(ostd::ConstCharRange expanded,
     return expanded;
 }
 
-int exec(cscript::CsState &cs, ostd::ConstCharRange target) {
+static int ob_exec_rule(ObState &os, ostd::ConstCharRange target,
+                        ostd::ConstCharRange from) {
     ostd::Vector<SubRule> rlist;
     for (auto &rule: rules.iter()) {
         if (target == rule.target) {
             rlist.push().rule = &rule;
             continue;
         }
-        ostd::ConstCharRange sub = compare_subst(target, rule.target);
+        ostd::ConstCharRange sub = ob_compare_subst(target, rule.target);
         if (!sub.empty()) {
             SubRule &sr = rlist.push();
             sr.rule = &rule;
             sr.sub = sub;
         }
     }
-    if (rlist.empty()) return 0;
-    return exec_func(cs, target, rlist);
+    if (rlist.empty() && !ob_check_file(target)) {
+        if (from.empty())
+            return ob_error(os, 1, "no rule to run target '%s'", target);
+        else
+            return ob_error(os, 1, "no rule to run target '%s' "
+                                   "(needed by '%s')",
+                            target, from);
+        return 1;
+    }
+    return ob_exec_func(os, target, rlist);
 }
 
-void rule(cscript::CsState &, const char *tgt, const char *dep, uint *body,
-          int *numargs) {
+static void ob_rule_cmd(cscript::CsState &, const char *tgt, const char *dep,
+                        ostd::Uint32 *body, int *numargs) {
     ostd::Vector<ostd::String> targets = cscript::util::list_explode(tgt);
     ostd::Vector<ostd::String> deps = cscript::util::list_explode(dep);
     for (auto &target: targets.iter()) {
@@ -192,21 +217,30 @@ void rule(cscript::CsState &, const char *tgt, const char *dep, uint *body,
 }
 
 int main(int argc, char **argv) {
-    cscript::CsState cs;
+    ObState os;
+    const char *lslash = strrchr(argv[0], '/');
+    if (lslash)
+        os.progname = lslash + 1;
+    else
+        os.progname = argv[0];
 
-    cscript::init_lib_base(cs);
-    cscript::init_lib_io(cs);
-    cscript::init_lib_math(cs);
-    cscript::init_lib_string(cs);
-    cscript::init_lib_list(cs);
+    cscript::init_lib_base(os.cs);
+    cscript::init_lib_io(os.cs);
+    cscript::init_lib_math(os.cs);
+    cscript::init_lib_string(os.cs);
+    cscript::init_lib_list(os.cs);
 
-    cs.add_command("shell", "C", [](cscript::CsState &cs, char *s) {
+    os.cs.add_command("shell", "C", [](cscript::CsState &cs, char *s) {
         cs.result->set_int(system(s));
     });
 
-    cs.add_command("rule", "sseN", rule);
+    os.cs.add_command("rule", "sseN", ob_rule_cmd);
 
-    if (!cs.run_file("cubefile", true))
-        return 1;
-    return exec(cs, (argc > 1) ? argv[1] : "all");
+    if (!os.cs.run_file("cubefile", true))
+        return ob_error(os, 1, "failed creating rules");
+
+    if (rules.empty())
+        return ob_error(os, 1, "no targets");
+
+    return ob_exec_rule(os, (argc > 1) ? argv[1] : "all");
 }

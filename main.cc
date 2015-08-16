@@ -218,11 +218,13 @@ static void ob_rule_cmd(cscript::CsState &, const char *tgt, const char *dep,
 
 int main(int argc, char **argv) {
     ObState os;
-    const char *lslash = strrchr(argv[0], '/');
-    if (lslash)
-        os.progname = lslash + 1;
-    else
-        os.progname = argv[0];
+    ostd::ConstCharRange pn = argv[0];
+    ostd::ConstCharRange lslash = ostd::find_last(pn, '/');
+    if (!lslash.empty()) {
+        lslash.pop_front();
+        os.progname = lslash;
+    } else
+        os.progname = pn;
 
     cscript::init_lib_base(os.cs);
     cscript::init_lib_io(os.cs);

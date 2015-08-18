@@ -11,3 +11,17 @@ It's similar in philosophy to tools such as Make.
 It needs libcubescript to function, which you can fetch at
 https://git.octaforge.org/tools/libcubescript.git/ or at
 https://github.com/OctaForge/libcubescript.
+
+## Features
+
+ * A real scripting language
+ * Similar to Make in many ways
+ * Currently manual dependency tracking
+
+Upcoming features:
+
+ * Automatic dependency tracking
+ * Parallel builds
+ * Shell independence
+ * Proper argument handling
+ * Platform related utilities

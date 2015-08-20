@@ -1,12 +1,12 @@
 # octabuild
 
-OctaBuild is a simple build system primarily intended to handle building of
-OctaForge binary modules.
+OctaBuild is a simple build system inspired by Make, but using the Cubescript
+language to write build definitions and not depending on a shell to function.
+It'll also feature things such as automatic dependency tracking and a large
+utility library abstracting away platform differences.
 
-It can also be used standalone. It consists of a library and an executable
-that is basically a frontend for the library. [not yet done]
-
-It's similar in philosophy to tools such as Make.
+It can be used standalone at this point. Once everything is more done, a library
+form will be introduced.
 
 It needs libcubescript to function, which you can fetch at
 https://git.octaforge.org/tools/libcubescript.git/ or at

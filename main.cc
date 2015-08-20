@@ -21,6 +21,13 @@ struct Rule {
 struct ObState {
     cscript::CsState cs;
     ostd::ConstCharRange progname;
+
+    template<typename ...A>
+    int error(int retcode, ostd::ConstCharRange fmt, A &&...args) {
+        ostd::err.write(progname, ": ");
+        ostd::err.writefln(fmt, ostd::forward<A>(args)...);
+        return retcode;
+    }
 };
 
 ostd::Vector<Rule> rules;
@@ -54,14 +61,6 @@ static bool ob_check_exec(ostd::ConstCharRange tname,
         if (!ob_check_file(dep))
             return true;
     return ob_check_ts(tname, deps);
-}
-
-template<typename ...A>
-static int ob_error(ObState &os, int retcode, ostd::ConstCharRange fmt,
-                    A &&...args) {
-    ostd::err.write(os.progname, ": ");
-    ostd::err.writefln(fmt, ostd::forward<A>(args)...);
-    return retcode;
 }
 
 static int ob_exec_rule(ObState &os, ostd::ConstCharRange target,
@@ -107,7 +106,7 @@ static int ob_exec_func(ObState &os, ostd::ConstCharRange tname,
             if (!r.func)
                 continue;
             if (func)
-                return ob_error(os, 1, "redefinition of rule '%s'", tname);
+                return os.error(1, "redefinition of rule '%s'", tname);
             func = r.func;
         }
         if (func) {
@@ -190,10 +189,9 @@ static int ob_exec_rule(ObState &os, ostd::ConstCharRange target,
     }
     if (rlist.empty() && !ob_check_file(target)) {
         if (from.empty())
-            return ob_error(os, 1, "no rule to run target '%s'", target);
+            return os.error(1, "no rule to run target '%s'", target);
         else
-            return ob_error(os, 1, "no rule to run target '%s' "
-                                   "(needed by '%s')",
+            return os.error(1, "no rule to run target '%s' (needed by '%s')",
                             target, from);
         return 1;
     }
@@ -239,10 +237,10 @@ int main(int argc, char **argv) {
     os.cs.add_command("rule", "sseN", ob_rule_cmd);
 
     if (!os.cs.run_file("cubefile", true))
-        return ob_error(os, 1, "failed creating rules");
+        return os.error(1, "failed creating rules");
 
     if (rules.empty())
-        return ob_error(os, 1, "no targets");
+        return os.error(1, "no targets");
 
     return ob_exec_rule(os, (argc > 1) ? argv[1] : "all");
 }

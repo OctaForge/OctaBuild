@@ -64,7 +64,7 @@ static bool ob_check_exec(ostd::ConstCharRange tname,
 }
 
 static int ob_exec_rule(ObState &os, ostd::ConstCharRange target,
-                        ostd::ConstCharRange from = ostd::ConstCharRange());
+                        ostd::ConstCharRange from = nullptr);
 
 struct SubRule {
     ostd::ConstCharRange sub;
@@ -147,14 +147,14 @@ static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
     auto rep = ostd::find(toexpand, '%');
     /* no subst found */
     if (rep.empty())
-        return ostd::ConstCharRange();
+        return nullptr;
     /* get the part before % */
     auto fp = ostd::slice_until(toexpand, rep);
     /* part before % does not compare, so ignore */
     if (expanded.size() <= fp.size())
-        return ostd::ConstCharRange();
+        return nullptr;
     if (expanded.slice(0, fp.size()) != fp)
-        return ostd::ConstCharRange();
+        return nullptr;
     /* pop out front part */
     expanded.pop_front_n(fp.size());
     /* part after % */
@@ -163,9 +163,9 @@ static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
         return expanded;
     /* part after % does not compare, so ignore */
     if (expanded.size() <= rep.size())
-        return ostd::ConstCharRange();
+        return nullptr;
     if (expanded.slice(expanded.size() - rep.size(), expanded.size()) != rep)
-        return ostd::ConstCharRange();
+        return nullptr;
     /* cut off latter part */
     expanded.pop_back_n(rep.size());
     /* we got what we wanted... */

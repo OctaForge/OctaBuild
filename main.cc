@@ -194,22 +194,6 @@ struct ObState {
     }
 };
 
-static void ob_rule_cmd(cscript::CsState &, const char *tgt, const char *dep,
-                        ostd::Uint32 *body, int *numargs) {
-    ostd::Vector<ostd::String> targets = cscript::util::list_explode(tgt);
-    ostd::Vector<ostd::String> deps = cscript::util::list_explode(dep);
-    for (auto &target: targets.iter()) {
-        Rule &r = rules.push();
-        r.target = target;
-        if (*numargs > 2) {
-            r.func = body;
-            cscript::bcode_ref(body);
-        }
-        for (auto &dep: deps.iter())
-            r.deps.push(dep);
-    }
-}
-
 int main(int argc, char **argv) {
     ObState os;
     ostd::ConstCharRange pn = argv[0];
@@ -230,7 +214,22 @@ int main(int argc, char **argv) {
         cs.result->set_int(system(s));
     });
 
-    os.cs.add_command("rule", "sseN", ob_rule_cmd);
+    os.cs.add_command("rule", "sseN", [](cscript::CsState &, const char *tgt,
+                                         const char *dep, ostd::Uint32 *body,
+                                         int *numargs) {
+        ostd::Vector<ostd::String> targets = cscript::util::list_explode(tgt);
+        ostd::Vector<ostd::String> deps = cscript::util::list_explode(dep);
+        for (auto &target: targets.iter()) {
+            Rule &r = rules.push();
+            r.target = target;
+            if (*numargs > 2) {
+                r.func = body;
+                cscript::bcode_ref(body);
+            }
+            for (auto &dep: deps.iter())
+                r.deps.push(dep);
+        }
+    });
 
     if (!os.cs.run_file("cubefile", true))
         return os.error(1, "failed creating rules");

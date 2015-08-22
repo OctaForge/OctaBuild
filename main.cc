@@ -6,6 +6,7 @@
 
 #include <cubescript.hh>
 
+/* represents a rule definition, possibly with a function */
 struct Rule {
     ostd::String target;
     ostd::Vector<ostd::String> deps;
@@ -20,23 +21,20 @@ struct Rule {
 
 ostd::Vector<Rule> rules;
 
-struct SubRule {
-    ostd::ConstCharRange sub;
-    Rule *rule;
-};
-
-static time_t ob_get_file_ts(const char *fname) {
-    struct stat st;
-    if (stat(fname, &st) < 0) return 0;
-    return st.st_mtime;
-}
+/* check funcs */
 
 static bool ob_check_ts(ostd::ConstCharRange tname,
                         const ostd::Vector<ostd::String> &deps) {
-    time_t tts = ob_get_file_ts(tname.data());
+    auto get_ts = [](ostd::ConstCharRange fname) -> time_t {
+        struct stat st;
+        if (stat(ostd::String(fname).data(), &st) < 0)
+            return 0;
+        return st.st_mtime;
+    };
+    time_t tts = get_ts(tname.data());
     if (!tts) return true;
     for (auto &dep: deps.iter()) {
-        time_t sts = ob_get_file_ts(dep.data());
+        time_t sts = get_ts(dep.data());
         if (sts && tts < sts) return true;
     }
     return false;
@@ -56,6 +54,7 @@ static bool ob_check_exec(ostd::ConstCharRange tname,
     return ob_check_ts(tname, deps);
 }
 
+/* this lets us properly match % patterns in target names */
 static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
                                              ostd::ConstCharRange toexpand) {
     auto rep = ostd::find(toexpand, '%');
@@ -89,6 +88,11 @@ static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
 struct ObState {
     cscript::CsState cs;
     ostd::ConstCharRange progname;
+
+    struct SubRule {
+        ostd::ConstCharRange sub;
+        Rule *rule;
+    };
 
     template<typename ...A>
     int error(int retcode, ostd::ConstCharRange fmt, A &&...args) {

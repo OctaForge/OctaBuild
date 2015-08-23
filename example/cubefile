@@ -1,6 +1,6 @@
 rule all test
 
-OBJ = [test.o foo.o bar.o]
+OBJ = (strreplace (glob "*.c") ".c" ".o")
 
 rule test $OBJ [
     echo " LD" $target

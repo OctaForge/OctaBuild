@@ -1,4 +1,5 @@
 #include <sys/stat.h>
+#include <dirent.h>
 
 #include <ostd/types.hh>
 #include <ostd/string.hh>
@@ -83,6 +84,124 @@ static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
     expanded.pop_back_n(rep.size());
     /* we got what we wanted... */
     return expanded;
+}
+
+/* expand globs */
+static bool ob_one_star(ostd::ConstCharRange st) {
+    st.pop_front();
+    ostd::ConstCharRange slash = ostd::find(st, '/');
+    if (!slash.empty())
+        st = ostd::slice_until(st, slash);
+    return ostd::find(st, '*').empty();
+}
+
+static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src,
+                           bool ne = false);
+
+static bool ob_expand_dir(ostd::String &ret,
+                          ostd::ConstCharRange dir,
+                          ostd::ConstCharRange pre,
+                          ostd::ConstCharRange post,
+                          ostd::ConstCharRange slash) {
+    DIR *d = opendir(ostd::String(dir).data());
+    bool appended = false;
+    if (!d)
+        return false;
+    struct dirent *dirp;
+    while ((dirp = readdir(d))) {
+        ostd::ConstCharRange fn = (const char *)dirp->d_name;
+        if (fn.empty() || (fn == ".") || (fn == ".."))
+            continue;
+        /* check if prefix matches */
+        if (!pre.empty()) {
+            if ((pre.size() > fn.size()) || (fn.slice(0, pre.size()) != pre))
+                continue;
+            fn = fn.slice(pre.size(), fn.size());
+        }
+        /* check if postfix matches */
+        if (!post.empty()) {
+            if (post.size() > fn.size())
+                continue;
+            if (fn.slice(fn.size() - post.size(), fn.size()) != post)
+                continue;
+        }
+        ostd::String afn((dir == ".") ? "" : "./");
+        afn.append(fn);
+        /* if we reach this, we match; try recursively matching */
+        if (!slash.empty()) {
+            afn.append(slash);
+            ostd::ConstCharRange psl = slash;
+            psl.pop_front();
+            if (!ostd::find(psl, '*').empty()) {
+                if (!appended)
+                    appended = ob_expand_glob(ret, afn.iter());
+                continue;
+            }
+            /* no further star, just do file test */
+            if (!ob_check_file(afn.iter()))
+                continue;
+            if (!ret.empty())
+                ret.push(' ');
+            ret.append(afn);
+            appended = true;
+            continue;
+        }
+        if (!ret.empty())
+            ret.push(' ');
+        ret.append(afn);
+        appended = true;
+    }
+    closedir(d);
+    return appended;
+}
+
+static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src, bool ne) {
+    ostd::ConstCharRange star = ostd::find(src, '*');
+    /* no star or multiple stars within the section, use as-is */
+    if (star.empty() || !ob_one_star(star)) {
+        if (ne) return false;
+        if (!ret.empty())
+            ret.push(' ');
+        ret.append(src);
+        return false;
+    }
+    /* part before star */
+    ostd::ConstCharRange prestar = ostd::slice_until(src, star);
+    /* try finding slash before star */
+    ostd::ConstCharRange slash = ostd::find_last(prestar, '/');
+    /* directory to scan */
+    ostd::ConstCharRange dir = ".";
+    /* part of name before star */
+    ostd::ConstCharRange fnpre = prestar;
+    if (!slash.empty()) {
+        /* there was slash, adjust directory + prefix accordingly */
+        dir = ostd::slice_until(src, slash);
+        fnpre = slash;
+        fnpre.pop_front();
+    }
+    /* part after star */
+    ostd::ConstCharRange fnpost = star;
+    fnpost.pop_front();
+    /* if a slash follows, adjust */
+    ostd::ConstCharRange nslash = ostd::find(fnpost, '/');
+    if (!nslash.empty())
+        fnpost = ostd::slice_until(fnpost, nslash);
+    /* do a directory scan and match */
+    if (!ob_expand_dir(ret, dir, fnpre, fnpost, nslash)) {
+        if (ne) return false;
+        if (!ret.empty())
+            ret.push(' ');
+        ret.append(src);
+        return false;
+    }
+    return true;
+}
+
+static ostd::String ob_expand_globs(const ostd::Vector<ostd::String> &src) {
+    ostd::String ret;
+    for (auto &s: src.iter())
+        ob_expand_glob(ret, s.iter());
+    return ret;
 }
 
 struct ObState {
@@ -233,6 +352,11 @@ int main(int argc, char **argv) {
             for (auto &dep: deps.iter())
                 r.deps.push(dep);
         }
+    });
+
+    os.cs.add_command("glob", "s", [](cscript::CsState &cs, const char *lst) {
+        ostd::Vector<ostd::String> fnames = cscript::util::list_explode(lst);
+        cs.result->set_str(ob_expand_globs(fnames).disown());
     });
 
     if (!os.cs.run_file("cubefile", true))

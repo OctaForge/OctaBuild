@@ -87,12 +87,53 @@ static ostd::ConstCharRange ob_compare_subst(ostd::ConstCharRange expanded,
 }
 
 /* expand globs */
-static bool ob_one_star(ostd::ConstCharRange st) {
-    st.pop_front();
-    ostd::ConstCharRange slash = ostd::find(st, '/');
-    if (!slash.empty())
-        st = ostd::slice_until(st, slash);
-    return ostd::find(st, '*').empty();
+static void ob_get_path_parts(ostd::Vector<ostd::ConstCharRange> &parts,
+                              ostd::ConstCharRange elem) {
+    ostd::ConstCharRange star = ostd::find(elem, '*');
+    while (!star.empty()) {
+        ostd::ConstCharRange ep = ostd::slice_until(elem, star);
+        if (!ep.empty())
+            parts.push(ep);
+        parts.push("*");
+        elem = star;
+        elem.pop_front();
+        star = ostd::find(elem, '*');
+    }
+    if (!elem.empty())
+        parts.push(elem);
+}
+
+static bool ob_path_matches(ostd::ConstCharRange fn,
+                            const ostd::Vector<ostd::ConstCharRange> &parts) {
+    auto it = parts.iter();
+    while (!it.empty()) {
+        ostd::ConstCharRange elem = it.front();
+        if (elem == "*") {
+            it.pop_front();
+            /* skip multiple stars if present */
+            while (!it.empty() && ((elem = it.front()) == "*"))
+                it.pop_front();
+            /* trailing stars, we match */
+            if (it.empty())
+                return true;
+            /* skip about as much as we can until the elem part matches */
+            while (fn.size() > elem.size()) {
+                if (fn.slice(0, elem.size()) == elem)
+                    break;
+                fn.pop_front();
+            }
+        }
+        /* non-star here */
+        if (fn.size() < elem.size())
+            return false;
+        if (fn.slice(0, elem.size()) != elem)
+            return false;
+        fn.pop_front_n(elem.size());
+        /* try next element */
+        it.pop_front();
+    }
+    /* if there are no chars in the fname remaining, we fully matched */
+    return fn.empty();
 }
 
 static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src,
@@ -100,8 +141,7 @@ static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src,
 
 static bool ob_expand_dir(ostd::String &ret,
                           ostd::ConstCharRange dir,
-                          ostd::ConstCharRange pre,
-                          ostd::ConstCharRange post,
+                          const ostd::Vector<ostd::ConstCharRange> &parts,
                           ostd::ConstCharRange slash) {
     DIR *d = opendir(ostd::String(dir).data());
     bool appended = false;
@@ -112,19 +152,9 @@ static bool ob_expand_dir(ostd::String &ret,
         ostd::ConstCharRange fn = (const char *)dirp->d_name;
         if (fn.empty() || (fn == ".") || (fn == ".."))
             continue;
-        /* check if prefix matches */
-        if (!pre.empty()) {
-            if ((pre.size() > fn.size()) || (fn.slice(0, pre.size()) != pre))
-                continue;
-            fn = fn.slice(pre.size(), fn.size());
-        }
-        /* check if postfix matches */
-        if (!post.empty()) {
-            if (post.size() > fn.size())
-                continue;
-            if (fn.slice(fn.size() - post.size(), fn.size()) != post)
-                continue;
-        }
+        /* check if filename matches */
+        if (!ob_path_matches(fn, parts))
+            continue;
         ostd::String afn((dir == ".") ? "" : "./");
         afn.append(fn);
         /* if we reach this, we match; try recursively matching */
@@ -157,8 +187,8 @@ static bool ob_expand_dir(ostd::String &ret,
 
 static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src, bool ne) {
     ostd::ConstCharRange star = ostd::find(src, '*');
-    /* no star or multiple stars within the section, use as-is */
-    if (star.empty() || !ob_one_star(star)) {
+    /* no star use as-is */
+    if (star.empty()) {
         if (ne) return false;
         if (!ret.empty())
             ret.push(' ');
@@ -186,8 +216,12 @@ static bool ob_expand_glob(ostd::String &ret, ostd::ConstCharRange src, bool ne)
     ostd::ConstCharRange nslash = ostd::find(fnpost, '/');
     if (!nslash.empty())
         fnpost = ostd::slice_until(fnpost, nslash);
+    /* retrieve the single element with whatever stars in it, chop it up */
+    ostd::Vector<ostd::ConstCharRange> parts;
+    ob_get_path_parts(parts, ostd::ConstCharRange(&fnpre[0],
+                                                  &fnpost[fnpost.size()]));
     /* do a directory scan and match */
-    if (!ob_expand_dir(ret, dir, fnpre, fnpost, nslash)) {
+    if (!ob_expand_dir(ret, dir, parts, nslash)) {
         if (ne) return false;
         if (!ret.empty())
             ret.push(' ');

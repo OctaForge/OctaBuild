@@ -5,6 +5,7 @@
 #include <ostd/types.hh>
 #include <ostd/string.hh>
 #include <ostd/vector.hh>
+#include <ostd/atomic.hh>
 
 #include <cubescript.hh>
 
@@ -24,6 +25,55 @@ struct Rule {
 };
 
 ostd::Vector<Rule> rules;
+
+struct RuleCounter;
+ostd::Vector<RuleCounter *> counters;
+
+struct RuleCounter {
+    RuleCounter(): cond(), mtx(), counter(0), result(0) {
+        counters.push(this);
+    }
+
+    void wait() {
+        mtx.lock();
+        while (counter)
+            cond.wait(mtx);
+        mtx.unlock();
+    }
+
+    void incr() {
+        mtx.lock();
+        ++counter;
+        mtx.unlock();
+    }
+
+    void decr() {
+        mtx.lock();
+        if (!--counter) {
+            mtx.unlock();
+            cond.broadcast();
+        } else
+            mtx.unlock();
+    }
+
+    int wait_result(int ret) {
+        counters.pop();
+        if (ret)
+            return ret;
+        wait();
+        ret = result;
+        if (ret)
+            return ret;
+        return 0;
+    }
+
+    Cond cond;
+    Mutex mtx;
+    volatile int counter;
+    ostd::AtomicInt result;
+};
+
+ThreadPool tpool;
 
 /* check funcs */
 
@@ -283,9 +333,14 @@ struct ObState {
     int exec_func(ostd::ConstCharRange tname,
                   const ostd::Vector<SubRule> &rlist) {
         ostd::Vector<ostd::String> subdeps;
-        int r = exec_list(rlist, subdeps, tname);
+        /* new scope for early destruction */
+        {
+            RuleCounter depcnt;
+            int r = depcnt.wait_result(exec_list(rlist, subdeps, tname));
+            if (r)
+                return r;
+        }
         if (ob_check_exec(tname, subdeps)) {
-            if (r) return r;
             ostd::Uint32 *func = nullptr;
             for (auto &sr: rlist.iter()) {
                 Rule &r = *sr.rule;
@@ -404,8 +459,20 @@ int main(int argc, char **argv) {
         }
     }
 
+    tpool.init(os.jobs);
+
     os.cs.add_command("shell", "C", [](cscript::CsState &cs, char *s) {
-        cs.result->set_int(system(s));
+        RuleCounter *cnt = counters.back();
+        cnt->incr();
+        char *dup = strdup(s);
+        tpool.push([cnt, dup]() {
+            int ret = system(dup);
+            free(dup);
+            if (ret && !cnt->result)
+                cnt->result = ret;
+            cnt->decr();
+        });
+        cs.result->set_int(0);
     });
 
     os.cs.add_command("rule", "sseN", [](cscript::CsState &, const char *tgt,
@@ -436,5 +503,11 @@ int main(int argc, char **argv) {
     if (rules.empty())
         return os.error(1, "no targets");
 
-    return os.exec_rule((optind < argc) ? argv[optind] : "all");
+    RuleCounter maincnt;
+    int ret = os.exec_rule((optind < argc) ? argv[optind] : "all");
+    ret = maincnt.wait_result(ret);
+    if (ret)
+        return ret;
+    tpool.destroy();
+    return 0;
 }

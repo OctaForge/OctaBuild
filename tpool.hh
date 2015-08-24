@@ -61,7 +61,7 @@ struct Task {
 };
 
 struct ThreadPool {
-    ThreadPool(ostd::Size size): size(size) {}
+    ThreadPool() {}
 
     ~ThreadPool() {
         if (running) destroy();
@@ -72,7 +72,7 @@ struct ThreadPool {
         return nullptr;
     }
 
-    bool init() {
+    bool init(ostd::Size size) {
         running = true;
         for (ostd::Size i = 0; i < size; ++i) {
             pthread_t tid;
@@ -88,9 +88,9 @@ struct ThreadPool {
         running = false;
         mtx.unlock();
         cond.broadcast();
-        for (ostd::Size i = 0; i < size; ++i) {
+        for (pthread_t &tid: thrs.iter()) {
             void *ret;
-            pthread_join(thrs[i], &ret);
+            pthread_join(tid, &ret);
             cond.broadcast();
         }
     }
@@ -127,7 +127,6 @@ struct ThreadPool {
     }
 
 private:
-    ostd::Size size;
     Cond cond;
     Mutex mtx;
     ostd::Vector<pthread_t> thrs;

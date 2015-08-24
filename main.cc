@@ -1,5 +1,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include <ostd/types.hh>
 #include <ostd/string.hh>
@@ -241,6 +242,7 @@ static ostd::String ob_expand_globs(const ostd::Vector<ostd::String> &src) {
 struct ObState {
     cscript::CsState cs;
     ostd::ConstCharRange progname;
+    int jobs = 1;
 
     struct SubRule {
         ostd::ConstCharRange sub;
@@ -351,6 +353,16 @@ struct ObState {
     }
 };
 
+static int ob_print_help(ostd::ConstCharRange a0, ostd::Stream &os, int v) {
+    os.writeln("Usage: ", a0,  " [options] [target]\n",
+               "Options:\n"
+               "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
+               "  -f FILE\tSpecify the file to run (default: cubefile).\n"
+               "  -h\t\tPrint this message.\n"
+               "  -j N\t\tSpecify the number of jobs to use (default: 1).");
+    return v;
+}
+
 int main(int argc, char **argv) {
     ObState os;
     ostd::ConstCharRange pn = argv[0];
@@ -366,6 +378,29 @@ int main(int argc, char **argv) {
     cscript::init_lib_math(os.cs);
     cscript::init_lib_string(os.cs);
     cscript::init_lib_list(os.cs);
+
+    ostd::ConstCharRange fname = "cubefile";
+
+    int ac;
+    while ((ac = getopt(argc, argv, "C:f:hj:")) >= 0) {
+        switch (ac) {
+        case 'C':
+            if (chdir(optarg) < 0)
+                return os.error(1, "failed changing directory: %s", optarg);
+            break;
+        case 'f':
+            fname = optarg;
+            break;
+        case 'h':
+            return ob_print_help(argv[0], ostd::out, 0);
+        case 'j':
+            os.jobs = ostd::max(1, atoi(optarg));
+            break;
+        default:
+            return ob_print_help(argv[0], ostd::err, 1);
+            break;
+        }
+    }
 
     os.cs.add_command("shell", "C", [](cscript::CsState &cs, char *s) {
         cs.result->set_int(system(s));
@@ -393,11 +428,11 @@ int main(int argc, char **argv) {
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });
 
-    if (!os.cs.run_file("cubefile", true))
+    if (!os.cs.run_file(fname, true))
         return os.error(1, "failed creating rules");
 
     if (rules.empty())
         return os.error(1, "no targets");
 
-    return os.exec_rule((argc > 1) ? argv[1] : "all");
+    return os.exec_rule((optind < argc) ? argv[optind] : "all");
 }

@@ -8,6 +8,8 @@
 
 #include <cubescript.hh>
 
+#include "tpool.hh"
+
 /* represents a rule definition, possibly with a function */
 struct Rule {
     ostd::String target;

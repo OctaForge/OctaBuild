@@ -461,13 +461,14 @@ int main(int argc, char **argv) {
 
     tpool.init(os.jobs);
 
-    os.cs.add_command("shell", "C", [](cscript::CsState &cs, char *s) {
+    os.cs.add_command("shell", "C", [](cscript::CsState &cs,
+                                       ostd::ConstCharRange s) {
         RuleCounter *cnt = counters.back();
         cnt->incr();
-        char *dup = strdup(s);
-        tpool.push([cnt, dup]() {
-            int ret = system(dup);
-            free(dup);
+        char *ds = ostd::String(s).disown();
+        tpool.push([cnt, ds]() {
+            int ret = system(ds);
+            delete[] ds;
             if (ret && !cnt->result)
                 cnt->result = ret;
             cnt->decr();

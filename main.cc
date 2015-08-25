@@ -493,7 +493,8 @@ int main(int argc, char **argv) {
         }
     });
 
-    os.cs.add_command("glob", "s", [](cscript::CsState &cs, const char *lst) {
+    os.cs.add_command("glob", "C", [](cscript::CsState &cs,
+                                      ostd::ConstCharRange lst) {
         ostd::Vector<ostd::String> fnames = cscript::util::list_explode(lst);
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });

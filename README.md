@@ -17,11 +17,11 @@ https://github.com/OctaForge/libcubescript.
  * A real scripting language
  * Similar to Make in many ways
  * Currently manual dependency tracking
+ * Parallel builds
 
 Upcoming features:
 
  * Automatic dependency tracking
- * Parallel builds
  * Shell independence
  * Proper argument handling
  * Platform related utilities

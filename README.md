@@ -25,3 +25,15 @@ Upcoming features:
  * Shell independence
  * Proper argument handling
  * Platform related utilities
+
+## Usage
+
+Use the provided script to build OctaBuild itself. You will need libcubescript
+and octastd in the right paths (you can adjust these paths within `compile.sh`)
+in order to compile it. There is a provided example build script in `example`.
+
+The octabuild binary supports the `-h` option to display help.
+
+## License
+
+See `COPYING.md`.

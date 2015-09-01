@@ -14,12 +14,14 @@
 using ostd::ConstCharRange;
 using ostd::Vector;
 using ostd::String;
+using ostd::Uint32;
+using ostd::slice_until;
 
 /* represents a rule definition, possibly with a function */
 struct Rule {
     String target;
     Vector<String> deps;
-    ostd::Uint32 *func;
+    Uint32 *func;
 
     Rule(): target(), deps(), func(nullptr) {}
     Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func) {
@@ -118,7 +120,7 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
     if (rep.empty())
         return nullptr;
     /* get the part before % */
-    auto fp = ostd::slice_until(toexpand, rep);
+    auto fp = slice_until(toexpand, rep);
     /* part before % does not compare, so ignore */
     if (expanded.size() <= fp.size())
         return nullptr;
@@ -144,9 +146,9 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
 /* expand globs */
 static void ob_get_path_parts(Vector<ConstCharRange> &parts,
                               ConstCharRange elem) {
-    ostd::ConstCharRange star = ostd::find(elem, '*');
+    ConstCharRange star = ostd::find(elem, '*');
     while (!star.empty()) {
-        ostd::ConstCharRange ep = ostd::slice_until(elem, star);
+        ConstCharRange ep = slice_until(elem, star);
         if (!ep.empty())
             parts.push(ep);
         parts.push("*");
@@ -249,7 +251,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
         return false;
     }
     /* part before star */
-    ConstCharRange prestar = ostd::slice_until(src, star);
+    ConstCharRange prestar = slice_until(src, star);
     /* try finding slash before star */
     ConstCharRange slash = ostd::find_last(prestar, '/');
     /* directory to scan */
@@ -258,7 +260,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
     ConstCharRange fnpre = prestar;
     if (!slash.empty()) {
         /* there was slash, adjust directory + prefix accordingly */
-        dir = ostd::slice_until(src, slash);
+        dir = slice_until(src, slash);
         fnpre = slash;
         fnpre.pop_front();
     }
@@ -268,7 +270,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
     /* if a slash follows, adjust */
     ConstCharRange nslash = ostd::find(fnpost, '/');
     if (!nslash.empty())
-        fnpost = ostd::slice_until(fnpost, nslash);
+        fnpost = slice_until(fnpost, nslash);
     /* retrieve the single element with whatever stars in it, chop it up */
     Vector<ConstCharRange> parts;
     ob_get_path_parts(parts, ConstCharRange(&fnpre[0], &fnpost[fnpost.size()]));
@@ -315,7 +317,7 @@ struct ObState {
             repd.clear();
             auto lp = ostd::find(atgt, '%');
             if (!lp.empty()) {
-                repd.append(ostd::slice_until(atgt, lp));
+                repd.append(slice_until(atgt, lp));
                 repd.append(sr.sub);
                 lp.pop_front();
                 if (!lp.empty()) repd.append(lp);
@@ -338,7 +340,7 @@ struct ObState {
                 return r;
         }
         if (ob_check_exec(tname, subdeps)) {
-            ostd::Uint32 *func = nullptr;
+            Uint32 *func = nullptr;
             for (auto &sr: rlist.iter()) {
                 Rule &r = *sr.rule;
                 if (!r.func)

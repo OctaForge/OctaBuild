@@ -1,11 +1,10 @@
-#include <sys/stat.h>
-#include <dirent.h>
 #include <unistd.h>
 
 #include <ostd/types.hh>
 #include <ostd/string.hh>
 #include <ostd/vector.hh>
 #include <ostd/atomic.hh>
+#include <ostd/filesystem.hh>
 
 #include <cubescript.hh>
 
@@ -85,10 +84,10 @@ ThreadPool tpool;
 
 static bool ob_check_ts(ConstCharRange tname, const Vector<String> &deps) {
     auto get_ts = [](ConstCharRange fname) -> time_t {
-        struct stat st;
-        if (stat(String(fname).data(), &st) < 0)
+        ostd::FileInfo fi(fname);
+        if (fi.type() != ostd::FileType::regular)
             return 0;
-        return st.st_mtime;
+        return fi.mtime();
     };
     time_t tts = get_ts(tname.data());
     if (!tts) return true;
@@ -198,15 +197,12 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne = false);
 static bool ob_expand_dir(String &ret, ConstCharRange dir,
                           const Vector<ConstCharRange> &parts,
                           ConstCharRange slash) {
-    DIR *d = opendir(String(dir).data());
+    ostd::DirectoryStream d(dir);
     bool appended = false;
-    if (!d)
+    if (!d.is_open())
         return false;
-    struct dirent *dirp;
-    while ((dirp = readdir(d))) {
-        ConstCharRange fn = (const char *)dirp->d_name;
-        if (fn.empty() || (fn == ".") || (fn == ".."))
-            continue;
+    for (auto &fi: d.iter()) {
+        ConstCharRange fn = fi.filename();
         /* check if filename matches */
         if (!ob_path_matches(fn, parts))
             continue;
@@ -236,7 +232,6 @@ static bool ob_expand_dir(String &ret, ConstCharRange dir,
         ret.append(afn);
         appended = true;
     }
-    closedir(d);
     return appended;
 }
 

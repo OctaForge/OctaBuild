@@ -89,10 +89,10 @@ static bool ob_check_ts(ConstCharRange tname, const Vector<String> &deps) {
             return 0;
         return fi.mtime();
     };
-    time_t tts = get_ts(tname.data());
+    time_t tts = get_ts(tname);
     if (!tts) return true;
     for (auto &dep: deps.iter()) {
-        time_t sts = get_ts(dep.data());
+        time_t sts = get_ts(dep);
         if (sts && (tts < sts)) return true;
     }
     return false;

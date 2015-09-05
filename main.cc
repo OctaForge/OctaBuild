@@ -201,7 +201,7 @@ static bool ob_expand_dir(String &ret, ConstCharRange dir,
     bool appended = false;
     if (!d.is_open())
         return false;
-    for (auto &fi: d.iter()) {
+    for (auto fi: d.iter()) {
         ConstCharRange fn = fi.filename();
         /* check if filename matches */
         if (!ob_path_matches(fn, parts))

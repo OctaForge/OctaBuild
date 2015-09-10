@@ -1,3 +1,6 @@
+#ifndef OCTABUILD_TPOOL_HH
+#define OCTABUILD_TPOOL_HH
+
 #include <pthread.h>
 
 #include <ostd/types.hh>
@@ -134,3 +137,5 @@ private:
     Task *last_task;
     volatile bool running;
 };
+
+#endif /* OCTABUILD_TPOOL_HH */

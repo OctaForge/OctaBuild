@@ -343,7 +343,7 @@ int main(int argc, char **argv) {
 
     cs_register_globs(os.cs);
 
-    if (!os.cs.run_file(fname, true))
+    if (!os.cs.run_file(fname))
         return os.error(1, "failed creating rules");
 
     if (rules.empty())

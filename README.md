@@ -28,9 +28,6 @@ Upcoming features:
 
 ## Usage
 
-Use the provided script to build OctaBuild itself. You will need
-libcubescript and octastd in the right paths.
-
 Use the provided Makefile to build - adjust the paths to OctaSTD and
 libcubescript if necessary. There is a provided example build script
 in `example`.

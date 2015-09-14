@@ -291,7 +291,7 @@ int main(int argc, char **argv) {
     while ((ac = getopt(argc, argv, "C:f:hj:")) >= 0) {
         switch (ac) {
         case 'C':
-            if (chdir(optarg) < 0)
+            if (!ostd::directory_change(optarg))
                 return os.error(1, "failed changing directory: %s", optarg);
             break;
         case 'f':

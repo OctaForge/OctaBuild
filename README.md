@@ -18,6 +18,7 @@ https://github.com/OctaForge/libcubescript.
  * Similar to Make in many ways
  * Currently manual dependency tracking
  * Parallel builds
+ * Glob matching
 
 Upcoming features:
 

@@ -265,7 +265,8 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
                "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
                "  -f FILE\tSpecify the file to run (default: cubefile).\n"
                "  -h\t\tPrint this message.\n"
-               "  -j N\t\tSpecify the number of jobs to use (default: 1).");
+               "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
+               "  -e STR\t\tEvaluate a string instead of a file.");
     return v;
 }
 
@@ -286,6 +287,7 @@ int main(int argc, char **argv) {
     cscript::init_lib_list(os.cs);
 
     ConstCharRange fname = "cubefile";
+    ConstCharRange fcont;
 
     int ac;
     while ((ac = getopt(argc, argv, "C:f:hj:")) >= 0) {
@@ -296,6 +298,9 @@ int main(int argc, char **argv) {
             break;
         case 'f':
             fname = optarg;
+            break;
+        case 'e':
+            fcont = optarg;
             break;
         case 'h':
             return ob_print_help(argv[0], ostd::out, 0);
@@ -343,7 +348,7 @@ int main(int argc, char **argv) {
 
     cs_register_globs(os.cs);
 
-    if (!os.cs.run_file(fname))
+    if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(fname))
         return os.error(1, "failed creating rules");
 
     if (rules.empty())

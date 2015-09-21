@@ -266,9 +266,12 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
                "  -f FILE\tSpecify the file to run (default: cubefile).\n"
                "  -h\t\tPrint this message.\n"
                "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
-               "  -e STR\t\tEvaluate a string instead of a file.");
+               "  -e STR\t\tEvaluate a string instead of a file.\n"
+               "  -E\t\tIgnore environment variables.");
     return v;
 }
+
+static bool ignore_env = false;
 
 int main(int argc, char **argv) {
     ObState os;
@@ -290,7 +293,7 @@ int main(int argc, char **argv) {
     ConstCharRange fcont;
 
     int ac;
-    while ((ac = getopt(argc, argv, "C:f:hj:")) >= 0) {
+    while ((ac = getopt(argc, argv, "C:f:hj:e:E")) >= 0) {
         switch (ac) {
         case 'C':
             if (!ostd::directory_change(optarg))
@@ -306,6 +309,9 @@ int main(int argc, char **argv) {
             return ob_print_help(argv[0], ostd::out, 0);
         case 'j':
             os.jobs = ostd::max(1, atoi(optarg));
+            break;
+        case 'E':
+            ignore_env = true;
             break;
         default:
             return ob_print_help(argv[0], ostd::err, 1);
@@ -344,6 +350,19 @@ int main(int argc, char **argv) {
             for (auto &dep: deps.iter())
                 r.deps.push(dep);
         }
+    });
+
+    os.cs.add_command("getenv", "s", [](cscript::CsState &cs, const char *en) {
+        if (ignore_env) {
+            cs.result->set_cstr("");
+            return;
+        }
+        const char *ret = getenv(en);
+        if (!ret || !ret[0]) {
+            cs.result->set_cstr("");
+            return;
+        }
+        cs.result->set_str_dup(ret);
     });
 
     cs_register_globs(os.cs);

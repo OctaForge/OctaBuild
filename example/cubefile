@@ -1,15 +1,24 @@
+CC = (getenv CC)
+
+if (=s $CC "") [
+    echo "no compiler found, using cc"
+    CC = "cc"
+] [
+    echo "using compiler:" $CC
+]
+
 rule all test
 
 OBJ = (strreplace (glob "*.c") ".c" ".o")
 
 rule test $OBJ [
     echo " LD" $target
-    shell cc -o $target $sources
+    shell $CC -o $target $sources
 ]
 
 rule %.o %.c [
     echo " CC" $target
-    shell cc -c -o $target $source
+    shell $CC -c -o $target $source
 ]
 
 rule clean [] [

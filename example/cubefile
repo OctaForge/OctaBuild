@@ -7,6 +7,9 @@ if (=s $CC "") [
     echo "using compiler:" $CC
 ]
 
+echo "number of CPUs:" $numcpus
+echo "number of jobs:" $numjobs
+
 rule all test
 
 OBJ = (strreplace (glob "*.c") ".c" ".o")

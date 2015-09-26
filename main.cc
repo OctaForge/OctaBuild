@@ -1,3 +1,4 @@
+#include <limits.h>
 #include <unistd.h>
 
 #include <ostd/types.hh>
@@ -5,6 +6,7 @@
 #include <ostd/vector.hh>
 #include <ostd/atomic.hh>
 #include <ostd/filesystem.hh>
+#include <ostd/platform.hh>
 
 #include <cubescript.hh>
 
@@ -289,6 +291,10 @@ int main(int argc, char **argv) {
     cscript::init_lib_string(os.cs);
     cscript::init_lib_list(os.cs);
 
+    int ncpus = ostd::cpu_count_get();
+    os.cs.add_ident(cscript::ID_VAR, "numcpus", INT_MAX, 1, &ncpus);
+    os.cs.add_ident(cscript::ID_VAR, "numjobs", INT_MAX, 1, &os.jobs);
+
     ConstCharRange fname = "cubefile";
     ConstCharRange fcont;
 
@@ -307,9 +313,12 @@ int main(int argc, char **argv) {
             break;
         case 'h':
             return ob_print_help(argv[0], ostd::out, 0);
-        case 'j':
-            os.jobs = ostd::max(1, atoi(optarg));
+        case 'j': {
+            int val = atoi(optarg);
+            if (!val) val = ncpus + 1;
+            os.jobs = ostd::max(1, val);
             break;
+        }
         case 'E':
             ignore_env = true;
             break;

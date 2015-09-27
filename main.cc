@@ -315,7 +315,7 @@ int main(int argc, char **argv) {
             return ob_print_help(argv[0], ostd::out, 0);
         case 'j': {
             int val = atoi(optarg);
-            if (!val) val = ncpus + 1;
+            if (!val) val = ncpus;
             os.jobs = ostd::max(1, val);
             break;
         }

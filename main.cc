@@ -32,10 +32,10 @@ struct Rule {
     ~Rule() { cscript::bcode_unref(func); }
 };
 
-Vector<Rule> rules;
+static Vector<Rule> rules;
 
 struct RuleCounter;
-Vector<RuleCounter *> counters;
+static Vector<RuleCounter *> counters;
 
 struct RuleCounter {
     RuleCounter(): cond(), mtx(), counter(0), result(0) {
@@ -81,7 +81,7 @@ struct RuleCounter {
     ostd::AtomicInt result;
 };
 
-ThreadPool tpool;
+static ThreadPool tpool;
 
 /* check funcs */
 

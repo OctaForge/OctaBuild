@@ -105,7 +105,8 @@ static bool ob_check_file(ConstCharRange fname) {
     return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
-static bool ob_check_exec(ConstCharRange tname, const Vector<String> &deps) {
+static bool ob_check_exec(ConstCharRange tname,
+                          const Vector<String> &deps) {
     if (!ob_check_file(tname))
         return true;
     for (auto &dep: deps.iter())
@@ -137,7 +138,8 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
     /* part after % does not compare, so ignore */
     if (expanded.size() <= rep.size())
         return nullptr;
-    if (expanded.slice(expanded.size() - rep.size(), expanded.size()) != rep)
+    ostd::Size es = expanded.size();
+    if (expanded.slice(es - rep.size(), es) != rep)
         return nullptr;
     /* cut off latter part */
     expanded.pop_back_n(rep.size());
@@ -165,21 +167,22 @@ struct ObState {
     int exec_list(const Vector<SubRule> &rlist, Vector<String> &subdeps,
                   ConstCharRange tname) {
         String repd;
-        for (auto &sr: rlist.iter()) for (auto &target: sr.rule->deps.iter()) {
-            ConstCharRange atgt = target.iter();
-            repd.clear();
-            auto lp = ostd::find(atgt, '%');
-            if (!lp.empty()) {
-                repd.append(slice_until(atgt, lp));
-                repd.append(sr.sub);
-                lp.pop_front();
-                if (!lp.empty()) repd.append(lp);
-                atgt = repd.iter();
+        for (auto &sr: rlist.iter())
+            for (auto &target: sr.rule->deps.iter()) {
+                ConstCharRange atgt = target.iter();
+                repd.clear();
+                auto lp = ostd::find(atgt, '%');
+                if (!lp.empty()) {
+                    repd.append(slice_until(atgt, lp));
+                    repd.append(sr.sub);
+                    lp.pop_front();
+                    if (!lp.empty()) repd.append(lp);
+                    atgt = repd.iter();
+                }
+                subdeps.push(atgt);
+                int r = exec_rule(atgt, tname);
+                if (r) return r;
             }
-            subdeps.push(atgt);
-            int r = exec_rule(atgt, tname);
-            if (r) return r;
-        }
         return 0;
     }
 
@@ -225,7 +228,8 @@ struct ObState {
                     auto dsv = ostd::appender<String>();
                     ostd::concat(dsv, subdeps);
                     ostd::Size len = dsv.size();
-                    sourcesv.set_str(ostd::CharRange(dsv.get().disown(), len));
+                    sourcesv.set_str(ostd::CharRange(dsv.get().disown(),
+                                                     len));
                     sourcesv.push();
                 }
 
@@ -330,7 +334,8 @@ int main(int argc, char **argv) {
 
     tpool.init(os.jobs);
 
-    os.cs.add_command("shell", "C", [](cscript::CsState &cs, ConstCharRange s) {
+    os.cs.add_command("shell", "C", [](cscript::CsState &cs,
+                                       ConstCharRange s) {
         RuleCounter *cnt = counters.back();
         cnt->incr();
         char *ds = String(s).disown();
@@ -361,7 +366,8 @@ int main(int argc, char **argv) {
         }
     });
 
-    os.cs.add_command("getenv", "s", [](cscript::CsState &cs, const char *en) {
+    os.cs.add_command("getenv", "s", [](cscript::CsState &cs,
+                                        const char *en) {
         if (ignore_env) {
             cs.result->set_cstr("");
             return;

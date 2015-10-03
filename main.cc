@@ -199,11 +199,10 @@ struct ObState {
             Uint32 *func = nullptr;
             for (auto &sr: rlist.iter()) {
                 Rule &r = *sr.rule;
-                if (!r.func)
-                    continue;
-                if (func)
-                    return error(1, "redefinition of rule '%s'", tname);
-                func = r.func;
+                if (r.func) {
+                    func = r.func;
+                    break;
+                }
             }
             if (func) {
                 cscript::StackedValue targetv, sourcev, sourcesv;
@@ -241,16 +240,45 @@ struct ObState {
 
     int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
         Vector<SubRule> rlist;
+        SubRule *frule = nullptr;
+        bool exact = false;
         for (auto &rule: rules.iter()) {
             if (target == rule.target) {
                 rlist.push().rule = &rule;
+                if (rule.func) {
+                    if (frule && exact)
+                        return error(1, "redefinition of rule '%s'",
+                                     target);
+                    if (!frule)
+                        frule = &rlist.back();
+                    else {
+                        *frule = rlist.back();
+                        rlist.pop();
+                    }
+                    exact = true;
+                }
                 continue;
             }
+            if (exact || !rule.func)
+                continue;
             ConstCharRange sub = ob_compare_subst(target, rule.target);
             if (!sub.empty()) {
                 SubRule &sr = rlist.push();
                 sr.rule = &rule;
                 sr.sub = sub;
+                if (frule) {
+                    if (sub.size() == frule->sub.size())
+                        return error(1, "redefinition of rule '%s'",
+                                     target);
+                    if (sub.size() < frule->sub.size()) {
+                        if (!frule)
+                            frule = &sr;
+                        else {
+                            *frule = sr;
+                            rlist.pop();
+                        }
+                    }
+                }
             }
         }
         if (rlist.empty() && !ob_check_file(target)) {

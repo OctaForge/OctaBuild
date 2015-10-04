@@ -19,6 +19,7 @@ https://github.com/OctaForge/libcubescript.
  * Currently manual dependency tracking
  * Parallel builds
  * Glob matching
+ * GNU Make style pattern rules
 
 Upcoming features:
 

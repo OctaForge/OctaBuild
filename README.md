@@ -9,8 +9,10 @@ It can be used standalone at this point. Once everything is more done, a
 library form will be introduced.
 
 It needs libcubescript to function, which you can fetch at
-https://git.octaforge.org/tools/libcubescript.git/ or at
-https://github.com/OctaForge/libcubescript.
+https://git.octaforge.org/tools/libcubescript.git or at
+https://github.com/OctaForge/libcubescript as well as OctaSTD
+at https://git.octaforge.org/tools/octastd.git or at
+https://github.com/OctaForge/OctaSTD.
 
 ## Features
 

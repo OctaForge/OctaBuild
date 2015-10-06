@@ -24,7 +24,7 @@ rule %.o %.c [
     shell $CC -c -o $target $source
 ]
 
-rule clean [] [
+rule- clean [
     echo " CLEAN" $OBJ test
     shell rm -f $OBJ test
 ]

@@ -394,6 +394,19 @@ int main(int argc, char **argv) {
         }
     });
 
+    os.cs.add_command("rule-", "seN", [](cscript::CsState &, const char *tgt,
+                                         ostd::Uint32 *body, int *numargs) {
+        auto targets = cscript::util::list_explode(tgt);
+        for (auto &target: targets.iter()) {
+            Rule &r = rules.push();
+            r.target = target;
+            if (*numargs > 1) {
+                r.func = body;
+                cscript::bcode_ref(body);
+            }
+        }
+    });
+
     os.cs.add_command("getenv", "s", [](cscript::CsState &cs,
                                         const char *en) {
         if (ignore_env) {

@@ -307,6 +307,22 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
 
 static bool ignore_env = false;
 
+static void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body) {
+    auto targets = cscript::util::list_explode(tgt);
+    auto deps = dep ? cscript::util::list_explode(dep)
+                    : ostd::Vector<ostd::String>();
+    for (auto &target: targets.iter()) {
+        Rule &r = rules.push();
+        r.target = target;
+        if (body) {
+            r.func = body;
+            cscript::bcode_ref(body);
+        }
+        for (auto &dep: deps.iter())
+            r.deps.push(dep);
+    }
+};
+
 int main(int argc, char **argv) {
     ObState os;
     ConstCharRange pn = argv[0];
@@ -380,31 +396,12 @@ int main(int argc, char **argv) {
     os.cs.add_command("rule", "sseN", [](cscript::CsState &, const char *tgt,
                                          const char *dep, ostd::Uint32 *body,
                                          int *numargs) {
-        auto targets = cscript::util::list_explode(tgt);
-        auto deps = cscript::util::list_explode(dep);
-        for (auto &target: targets.iter()) {
-            Rule &r = rules.push();
-            r.target = target;
-            if (*numargs > 2) {
-                r.func = body;
-                cscript::bcode_ref(body);
-            }
-            for (auto &dep: deps.iter())
-                r.deps.push(dep);
-        }
+        rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
     });
 
     os.cs.add_command("rule-", "seN", [](cscript::CsState &, const char *tgt,
                                          ostd::Uint32 *body, int *numargs) {
-        auto targets = cscript::util::list_explode(tgt);
-        for (auto &target: targets.iter()) {
-            Rule &r = rules.push();
-            r.target = target;
-            if (*numargs > 1) {
-                r.func = body;
-                cscript::bcode_ref(body);
-            }
-        }
+        rule_add(tgt, nullptr, (*numargs > 1) ? body : nullptr);
     });
 
     os.cs.add_command("getenv", "s", [](cscript::CsState &cs,

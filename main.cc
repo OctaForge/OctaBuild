@@ -19,6 +19,10 @@ using ostd::String;
 using ostd::Uint32;
 using ostd::slice_until;
 
+using cscript::CsState;
+using cscript::TvalRange;
+using cscript::StackedValue;
+
 /* represents a rule definition, possibly with a function */
 struct Rule {
     String target;
@@ -148,7 +152,7 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
 }
 
 struct ObState {
-    cscript::CsState cs;
+    CsState cs;
     ConstCharRange progname;
     int jobs = 1;
 
@@ -205,7 +209,7 @@ struct ObState {
                 }
             }
             if (func) {
-                cscript::StackedValue targetv, sourcev, sourcesv;
+                StackedValue targetv, sourcev, sourcesv;
 
                 targetv.id = cs.new_ident("target");
                 if (!cscript::check_alias(targetv.id))
@@ -378,8 +382,7 @@ int main(int argc, char **argv) {
 
     tpool.init(os.jobs);
 
-    os.cs.add_command("shell", "C", [](cscript::CsState &cs,
-                                       ConstCharRange s) {
+    os.cs.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
         RuleCounter *cnt = counters.back();
         cnt->incr();
         char *ds = String(s).disown();
@@ -393,24 +396,23 @@ int main(int argc, char **argv) {
         cs.result->set_int(0);
     });
 
-    os.cs.add_command("rule", "sseN", [](cscript::CsState &, const char *tgt,
+    os.cs.add_command("rule", "sseN", [](CsState &, const char *tgt,
                                          const char *dep, ostd::Uint32 *body,
                                          int *numargs) {
         rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
     });
 
-    os.cs.add_command("rule-", "seN", [](cscript::CsState &, const char *tgt,
+    os.cs.add_command("rule-", "seN", [](CsState &, const char *tgt,
                                          ostd::Uint32 *body, int *numargs) {
         rule_add(tgt, nullptr, (*numargs > 1) ? body : nullptr);
     });
 
-    os.cs.add_command("getenv", "s", [](cscript::CsState &cs,
-                                        const char *en) {
+    os.cs.add_commandn("getenv", "s", [](CsState &cs, TvalRange args) {
         if (ignore_env) {
             cs.result->set_cstr("");
             return;
         }
-        const char *ret = getenv(en);
+        const char *ret = getenv(args[0].get_str().data());
         if (!ret || !ret[0]) {
             cs.result->set_cstr("");
             return;

@@ -157,6 +157,7 @@ struct ObState {
     CsState cs;
     ConstCharRange progname;
     int jobs = 1;
+    bool ignore_env = false;
 
     struct SubRule {
         ConstCharRange sub;
@@ -322,8 +323,6 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
     return v;
 }
 
-static bool ignore_env = false;
-
 static void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body) {
     auto targets = cscript::util::list_explode(tgt);
     auto deps = dep ? cscript::util::list_explode(dep)
@@ -385,7 +384,7 @@ int main(int argc, char **argv) {
             break;
         }
         case 'E':
-            ignore_env = true;
+            os.ignore_env = true;
             break;
         default:
             return ob_print_help(argv[0], ostd::err, 1);
@@ -421,7 +420,7 @@ int main(int argc, char **argv) {
     });
 
     os.cs.add_commandn("getenv", "s", [](CsState &cs, TvalRange args) {
-        if (ignore_env) {
+        if (((ObState &)cs).ignore_env) {
             cs.result->set_cstr("");
             return;
         }

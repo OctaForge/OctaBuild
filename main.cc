@@ -25,68 +25,6 @@ using cscript::CsState;
 using cscript::TvalRange;
 using cscript::StackedValue;
 
-/* represents a rule definition, possibly with a function */
-struct Rule {
-    String target;
-    Vector<String> deps;
-    Uint32 *func;
-
-    Rule(): target(), deps(), func(nullptr) {}
-    Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func) {
-        cscript::bcode_ref(func);
-    }
-    ~Rule() { cscript::bcode_unref(func); }
-};
-
-static Vector<Rule> rules;
-
-struct RuleCounter;
-static Vector<RuleCounter *> counters;
-
-struct RuleCounter {
-    RuleCounter(): cond(), mtx(), counter(0), result(0) {
-        counters.push(this);
-    }
-
-    void wait() {
-        mtx.lock();
-        while (counter)
-            cond.wait(mtx);
-        mtx.unlock();
-    }
-
-    void incr() {
-        mtx.lock();
-        ++counter;
-        mtx.unlock();
-    }
-
-    void decr() {
-        mtx.lock();
-        if (!--counter) {
-            mtx.unlock();
-            cond.broadcast();
-        } else
-            mtx.unlock();
-    }
-
-    int wait_result(int ret) {
-        counters.pop();
-        if (ret)
-            return ret;
-        wait();
-        ret = result;
-        if (ret)
-            return ret;
-        return 0;
-    }
-
-    Cond cond;
-    Mutex mtx;
-    volatile int counter;
-    ostd::AtomicInt result;
-};
-
 static ThreadPool tpool;
 
 /* check funcs */
@@ -159,12 +97,74 @@ struct ObState {
     int jobs = 1;
     bool ignore_env = false;
 
+    /* represents a rule definition, possibly with a function */
+    struct Rule {
+        String target;
+        Vector<String> deps;
+        Uint32 *func;
+
+        Rule(): target(), deps(), func(nullptr) {}
+        Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func) {
+            cscript::bcode_ref(func);
+        }
+        ~Rule() { cscript::bcode_unref(func); }
+    };
+
+    Vector<Rule> rules;
+
     struct SubRule {
         ConstCharRange sub;
         Rule *rule;
     };
 
     Map<ConstCharRange, Vector<SubRule>> cache;
+
+    struct RuleCounter {
+        RuleCounter(Vector<RuleCounter *> &ctrs): cond(), mtx(), counter(0),
+                                                  result(0) {
+            ctrs.push(this);
+        }
+
+        void wait() {
+            mtx.lock();
+            while (counter)
+                cond.wait(mtx);
+            mtx.unlock();
+        }
+
+        void incr() {
+            mtx.lock();
+            ++counter;
+            mtx.unlock();
+        }
+
+        void decr() {
+            mtx.lock();
+            if (!--counter) {
+                mtx.unlock();
+                cond.broadcast();
+            } else
+                mtx.unlock();
+        }
+
+        int wait_result(Vector<RuleCounter *> &ctrs, int ret) {
+            ctrs.pop();
+            if (ret)
+                return ret;
+            wait();
+            ret = result;
+            if (ret)
+                return ret;
+            return 0;
+        }
+
+        Cond cond;
+        Mutex mtx;
+        volatile int counter;
+        ostd::AtomicInt result;
+    };
+
+    Vector<RuleCounter *> counters;
 
     template<typename ...A>
     int error(int retcode, ConstCharRange fmt, A &&...args) {
@@ -199,8 +199,9 @@ struct ObState {
         Vector<String> subdeps;
         /* new scope for early destruction */
         {
-            RuleCounter depcnt;
-            int r = depcnt.wait_result(exec_list(rlist, subdeps, tname));
+            RuleCounter depcnt(counters);
+            int r = depcnt.wait_result(counters, exec_list(rlist, subdeps,
+                                                           tname));
             if (r)
                 return r;
         }
@@ -309,6 +310,22 @@ struct ObState {
         }
         return exec_func(target, rlist);
     }
+
+    void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body) {
+        auto targets = cscript::util::list_explode(tgt);
+        auto deps = dep ? cscript::util::list_explode(dep)
+                        : ostd::Vector<ostd::String>();
+        for (auto &target: targets.iter()) {
+            Rule &r = rules.push();
+            r.target = target;
+            if (body) {
+                r.func = body;
+                cscript::bcode_ref(body);
+            }
+            for (auto &dep: deps.iter())
+                r.deps.push(dep);
+        }
+    }
 };
 
 static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
@@ -322,22 +339,6 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
                "  -E\t\tIgnore environment variables.");
     return v;
 }
-
-static void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body) {
-    auto targets = cscript::util::list_explode(tgt);
-    auto deps = dep ? cscript::util::list_explode(dep)
-                    : ostd::Vector<ostd::String>();
-    for (auto &target: targets.iter()) {
-        Rule &r = rules.push();
-        r.target = target;
-        if (body) {
-            r.func = body;
-            cscript::bcode_ref(body);
-        }
-        for (auto &dep: deps.iter())
-            r.deps.push(dep);
-    }
-};
 
 int main(int argc, char **argv) {
     ObState os;
@@ -395,7 +396,7 @@ int main(int argc, char **argv) {
     tpool.init(os.jobs);
 
     os.cs.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
-        RuleCounter *cnt = counters.back();
+        auto cnt = ((ObState &)cs).counters.back();
         cnt->incr();
         char *ds = String(s).disown();
         tpool.push([cnt, ds]() {
@@ -408,15 +409,15 @@ int main(int argc, char **argv) {
         cs.result->set_int(0);
     });
 
-    os.cs.add_command("rule", "sseN", [](CsState &, const char *tgt,
+    os.cs.add_command("rule", "sseN", [](CsState &cs, const char *tgt,
                                          const char *dep, ostd::Uint32 *body,
                                          int *numargs) {
-        rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
+        ((ObState &)cs).rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
     });
 
-    os.cs.add_command("rule-", "seN", [](CsState &, const char *tgt,
+    os.cs.add_command("rule-", "seN", [](CsState &cs, const char *tgt,
                                          ostd::Uint32 *body, int *numargs) {
-        rule_add(tgt, nullptr, (*numargs > 1) ? body : nullptr);
+        ((ObState &)cs).rule_add(tgt, nullptr, (*numargs > 1) ? body : nullptr);
     });
 
     os.cs.add_commandn("getenv", "s", [](CsState &cs, TvalRange args) {
@@ -437,12 +438,12 @@ int main(int argc, char **argv) {
     if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(fname))
         return os.error(1, "failed creating rules");
 
-    if (rules.empty())
+    if (os.rules.empty())
         return os.error(1, "no targets");
 
-    RuleCounter maincnt;
+    ObState::RuleCounter maincnt(os.counters);
     int ret = os.exec_rule((optind < argc) ? argv[optind] : "all");
-    ret = maincnt.wait_result(ret);
+    ret = maincnt.wait_result(os.counters, ret);
     if (ret)
         return ret;
     tpool.destroy();

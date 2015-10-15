@@ -4,6 +4,7 @@
 #include <ostd/types.hh>
 #include <ostd/string.hh>
 #include <ostd/vector.hh>
+#include <ostd/map.hh>
 #include <ostd/atomic.hh>
 #include <ostd/filesystem.hh>
 #include <ostd/platform.hh>
@@ -15,6 +16,7 @@
 
 using ostd::ConstCharRange;
 using ostd::Vector;
+using ostd::Map;
 using ostd::String;
 using ostd::Uint32;
 using ostd::slice_until;
@@ -161,6 +163,8 @@ struct ObState {
         Rule *rule;
     };
 
+    Map<ConstCharRange, Vector<SubRule>> cache;
+
     template<typename ...A>
     int error(int retcode, ConstCharRange fmt, A &&...args) {
         ostd::err.write(progname, ": ");
@@ -242,8 +246,9 @@ struct ObState {
         return 0;
     }
 
-    int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
-        Vector<SubRule> rlist;
+    int find_rules(ConstCharRange target, Vector<SubRule> &rlist) {
+        if (!rlist.empty())
+            return 0;
         SubRule *frule = nullptr;
         bool exact = false;
         for (auto &rule: rules.iter()) {
@@ -285,6 +290,14 @@ struct ObState {
                 }
             }
         }
+        return 0;
+    }
+
+    int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
+        Vector<SubRule> &rlist = cache[target];
+        int fret = find_rules(target, rlist);
+        if (fret)
+            return fret;
         if (rlist.empty() && !ob_check_file(target)) {
             if (from.empty())
                 return error(1, "no rule to run target '%s'", target);

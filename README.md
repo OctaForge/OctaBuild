@@ -29,6 +29,7 @@ Upcoming features:
  * Shell independence
  * Proper argument handling
  * Platform related utilities
+ * Rule pre-callbacks
 
 ## Usage
 

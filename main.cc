@@ -59,6 +59,10 @@ static bool ob_check_exec(ConstCharRange tname,
     return ob_check_ts(tname, deps);
 }
 
+static ConstCharRange ob_get_env(ConstCharRange ename) {
+    return getenv(ostd::String(ename).data());
+}
+
 /* this lets us properly match % patterns in target names */
 static ConstCharRange ob_compare_subst(ConstCharRange expanded,
                                        ConstCharRange toexpand) {
@@ -425,12 +429,11 @@ int main(int argc, char **argv) {
             cs.result->set_cstr("");
             return;
         }
-        const char *ret = getenv(args[0].get_str().data());
-        if (!ret || !ret[0]) {
+        auto ret = ob_get_env(args[0].get_str());
+        if (ret.empty())
             cs.result->set_cstr("");
-            return;
-        }
-        cs.result->set_str_dup(ret);
+        else
+            cs.result->set_str_dup(ret);
     });
 
     cs_register_globs(os.cs);

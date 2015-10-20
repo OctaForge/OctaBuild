@@ -25,8 +25,6 @@ using cscript::CsState;
 using cscript::TvalRange;
 using cscript::StackedValue;
 
-static ThreadPool tpool;
-
 /* check funcs */
 
 static bool ob_check_ts(ConstCharRange tname, const Vector<String> &deps) {
@@ -98,6 +96,7 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
 struct ObState {
     CsState cs;
     ConstCharRange progname;
+    ThreadPool tpool;
     int jobs = 1;
     bool ignore_env = false;
 
@@ -169,6 +168,10 @@ struct ObState {
     };
 
     Vector<RuleCounter *> counters;
+
+    ~ObState() {
+        tpool.destroy();
+    }
 
     template<typename ...A>
     int error(int retcode, ConstCharRange fmt, A &&...args) {
@@ -397,13 +400,13 @@ int main(int argc, char **argv) {
         }
     }
 
-    tpool.init(os.jobs);
+    os.tpool.init(os.jobs);
 
     os.cs.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
         auto cnt = ((ObState &)cs).counters.back();
         cnt->incr();
         char *ds = String(s).disown();
-        tpool.push([cnt, ds]() {
+        ((ObState &)cs).tpool.push([cnt, ds]() {
             int ret = system(ds);
             delete[] ds;
             if (ret && !cnt->result)
@@ -449,6 +452,5 @@ int main(int argc, char **argv) {
     ret = maincnt.wait_result(os.counters, ret);
     if (ret)
         return ret;
-    tpool.destroy();
     return 0;
 }

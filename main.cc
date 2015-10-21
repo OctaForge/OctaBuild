@@ -318,6 +318,11 @@ struct ObState {
         return exec_func(target, rlist);
     }
 
+    int exec_main(ConstCharRange target) {
+        RuleCounter cnt(counters);
+        return cnt.wait_result(counters, exec_rule(target));
+    }
+
     void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body) {
         auto targets = cscript::util::list_explode(tgt);
         auto deps = dep ? cscript::util::list_explode(dep)
@@ -447,10 +452,5 @@ int main(int argc, char **argv) {
     if (os.rules.empty())
         return os.error(1, "no targets");
 
-    ObState::RuleCounter maincnt(os.counters);
-    int ret = os.exec_rule((optind < argc) ? argv[optind] : "all");
-    ret = maincnt.wait_result(os.counters, ret);
-    if (ret)
-        return ret;
-    return 0;
+    return os.exec_main((optind < argc) ? argv[optind] : "all");
 }

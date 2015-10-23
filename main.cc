@@ -344,7 +344,7 @@ static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
     os.writeln("Usage: ", a0,  " [options] [target]\n",
                "Options:\n"
                "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
-               "  -f FILE\tSpecify the file to run (default: cubefile).\n"
+               "  -f FILE\tSpecify the file to run (default: obuild.cfg).\n"
                "  -h\t\tPrint this message.\n"
                "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
                "  -e STR\t\tEvaluate a string instead of a file.\n"
@@ -372,7 +372,7 @@ int main(int argc, char **argv) {
     os.cs.add_ident(cscript::ID_VAR, "numcpus", INT_MAX, 1, &ncpus);
     os.cs.add_ident(cscript::ID_VAR, "numjobs", INT_MAX, 1, &os.jobs);
 
-    ConstCharRange fname = "cubefile";
+    ConstCharRange fname = "obuild.cfg";
     ConstCharRange fcont;
 
     int ac;

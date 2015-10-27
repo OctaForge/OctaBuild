@@ -464,5 +464,5 @@ int main(int argc, char **argv) {
     if (os.rules.empty())
         return os.error(1, "no targets");
 
-    return os.exec_main((optind < argc) ? argv[optind] : "all");
+    return os.exec_main((optind < argc) ? argv[optind] : "default");
 }

@@ -456,6 +456,10 @@ int main(int argc, char **argv) {
             cs.result->set_str_dup(ret);
     });
 
+    os.cs.add_command("invoke", "s", [](CsState &cs, const char *name) {
+        cs.result->set_int(((ObState &)cs).exec_main(name));
+    });
+
     cs_register_globs(os.cs);
 
     if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(fname))

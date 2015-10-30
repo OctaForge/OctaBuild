@@ -444,6 +444,11 @@ int main(int argc, char **argv) {
         ((ObState &)cs).rule_add(an, nullptr, body, true);
     });
 
+    os.cs.add_command("depend", "ss", [](CsState &cs, const char *file,
+                                         const char *deps) {
+        ((ObState &)cs).rule_add(file, deps, nullptr);
+    });
+
     os.cs.add_commandn("getenv", "s", [](CsState &cs, TvalRange args) {
         if (((ObState &)cs).ignore_env) {
             cs.result->set_cstr("");

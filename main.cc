@@ -47,8 +47,7 @@ static bool ob_check_file(ConstCharRange fname) {
     return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
-static bool ob_check_exec(ConstCharRange tname,
-                          const Vector<String> &deps) {
+static bool ob_check_exec(ConstCharRange tname, const Vector<String> &deps) {
     if (!ob_check_file(tname))
         return true;
     for (auto &dep: deps.iter())
@@ -366,8 +365,9 @@ int main(int argc, char **argv) {
     if (!lslash.empty()) {
         lslash.pop_front();
         os.progname = lslash;
-    } else
+    } else {
         os.progname = pn;
+    }
 
     cscript::init_lib_base(os.cs);
     cscript::init_lib_io(os.cs);

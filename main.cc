@@ -418,6 +418,7 @@ int main(int argc, char **argv) {
         auto cnt = ((ObState &)cs).counters.back();
         cnt->incr();
         String ds = s;
+        /* in c++14 we can use generalized lambda captures to move the str */
         tpool.push([cnt, ds]() {
             int ret = system(ds.data());
             if (ret && !cnt->result)

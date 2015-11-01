@@ -417,10 +417,9 @@ int main(int argc, char **argv) {
     os.cs.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
         auto cnt = ((ObState &)cs).counters.back();
         cnt->incr();
-        char *ds = String(s).disown();
+        String ds = s;
         tpool.push([cnt, ds]() {
-            int ret = system(ds);
-            delete[] ds;
+            int ret = system(ds.data());
             if (ret && !cnt->result)
                 cnt->result = ret;
             cnt->decr();

@@ -202,15 +202,9 @@ struct ObState {
 
     int exec_func(ConstCharRange tname, const Vector<SubRule> &rlist) {
         Vector<String> subdeps;
-        /* new scope for early destruction */
-        {
-            RuleCounter depcnt(counters);
-            int r = depcnt.wait_result(counters, exec_list(rlist, subdeps,
-                                                           tname));
-            if (r)
-                return r;
-        }
-        if (ob_check_exec(tname, subdeps)) {
+        int ret = RuleCounter(counters)
+                 .wait_result(counters, exec_list(rlist, subdeps, tname));
+        if (!ret && ob_check_exec(tname, subdeps)) {
             Uint32 *func = nullptr;
             for (auto &sr: rlist.iter()) {
                 Rule &r = *sr.rule;
@@ -250,7 +244,7 @@ struct ObState {
                 return cs.run_int(func);
             }
         }
-        return 0;
+        return ret;
     }
 
     int exec_action(Rule *rule) {

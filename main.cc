@@ -125,10 +125,7 @@ struct ObState {
     Map<ConstCharRange, Vector<SubRule>> cache;
 
     struct RuleCounter {
-        RuleCounter(Vector<RuleCounter *> &ctrs): cond(), mtx(), counter(0),
-                                                  result(0) {
-            ctrs.push(this);
-        }
+        RuleCounter(): cond(), mtx(), counter(0), result(0) {}
 
         void wait() {
             mtx.lock();
@@ -152,17 +149,6 @@ struct ObState {
                 mtx.unlock();
         }
 
-        int wait_result(Vector<RuleCounter *> &ctrs, int ret) {
-            ctrs.pop();
-            if (ret)
-                return ret;
-            wait();
-            ret = result;
-            if (ret)
-                return ret;
-            return 0;
-        }
-
         Cond cond;
         Mutex mtx;
         volatile int counter;
@@ -170,6 +156,17 @@ struct ObState {
     };
 
     Vector<RuleCounter *> counters;
+
+    template<typename F>
+    int wait_result(F func) {
+        RuleCounter ctr;
+        counters.push(&ctr);
+        int ret = func();
+        counters.pop();
+        if (ret) return ret;
+        ctr.wait();
+        return ctr.result;
+    }
 
     template<typename ...A>
     int error(int retcode, ConstCharRange fmt, A &&...args) {
@@ -202,8 +199,9 @@ struct ObState {
 
     int exec_func(ConstCharRange tname, const Vector<SubRule> &rlist) {
         Vector<String> subdeps;
-        int ret = RuleCounter(counters)
-                 .wait_result(counters, exec_list(rlist, subdeps, tname));
+        int ret = wait_result([&rlist, &subdeps, &tname, this]() {
+            return exec_list(rlist, subdeps, tname);
+        });
         if (!ret && ob_check_exec(tname, subdeps)) {
             Uint32 *func = nullptr;
             for (auto &sr: rlist.iter()) {
@@ -317,8 +315,7 @@ struct ObState {
     }
 
     int exec_main(ConstCharRange target) {
-        RuleCounter cnt(counters);
-        return cnt.wait_result(counters, exec_rule(target));
+        return wait_result([&target, this]() { return exec_rule(target); });
     }
 
     void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body,

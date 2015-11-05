@@ -178,22 +178,21 @@ struct ObState {
     int exec_list(const Vector<SubRule> &rlist, Vector<String> &subdeps,
                   ConstCharRange tname) {
         String repd;
-        for (auto &sr: rlist.iter())
-            for (auto &target: sr.rule->deps.iter()) {
-                ConstCharRange atgt = target.iter();
-                repd.clear();
-                auto lp = ostd::find(atgt, '%');
-                if (!lp.empty()) {
-                    repd.append(slice_until(atgt, lp));
-                    repd.append(sr.sub);
-                    lp.pop_front();
-                    if (!lp.empty()) repd.append(lp);
-                    atgt = repd.iter();
-                }
-                subdeps.push(atgt);
-                int r = exec_rule(atgt, tname);
-                if (r) return r;
+        for (auto &sr: rlist.iter()) for (auto &target: sr.rule->deps.iter()) {
+            ConstCharRange atgt = target.iter();
+            repd.clear();
+            auto lp = ostd::find(atgt, '%');
+            if (!lp.empty()) {
+                repd.append(slice_until(atgt, lp));
+                repd.append(sr.sub);
+                lp.pop_front();
+                if (!lp.empty()) repd.append(lp);
+                atgt = repd.iter();
             }
+            subdeps.push(atgt);
+            int r = exec_rule(atgt, tname);
+            if (r) return r;
+        }
         return 0;
     }
 
@@ -399,7 +398,6 @@ int main(int argc, char **argv) {
             break;
         default:
             return ob_print_help(argv[0], ostd::err, 1);
-            break;
         }
     }
 

@@ -438,16 +438,20 @@ int main(int argc, char **argv) {
         ((ObState &)cs).rule_add(file, deps, nullptr);
     });
 
-    os.cs.add_commandn("getenv", "s", [](CsState &cs, TvalRange args) {
+    os.cs.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {
         if (((ObState &)cs).ignore_env) {
             cs.result->set_cstr("");
             return;
         }
         auto ret = ob_get_env(args[0].get_str());
-        if (ret.empty())
-            cs.result->set_cstr("");
-        else
+        if (ret.empty()) {
+            if (!args[1].get_str().empty())
+                cs.result->set_str_dup(args[1].get_str());
+            else
+                cs.result->set_cstr("");
+        } else {
             cs.result->set_str_dup(ret);
+        }
     });
 
     os.cs.add_command("invoke", "s", [](CsState &cs, const char *name) {

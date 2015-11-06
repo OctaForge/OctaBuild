@@ -159,4 +159,27 @@ void cs_register_globs(cscript::CsState &cs) {
         auto fnames = cscript::util::list_explode(lst);
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });
+
+    cs.add_command("extreplace", "sss", [](cscript::CsState &cs,
+                                           const char *lst,
+                                           const char *oldext,
+                                           const char *newext) {
+        String ret;
+        if (oldext[0] == '.') ++oldext;
+        if (newext[0] == '.') ++newext;
+        auto fnames = cscript::util::list_explode(lst);
+        for (ConstCharRange it: fnames.iter()) {
+            if (!ret.empty()) ret += ' ';
+            auto dot = ostd::find_last(it, '.');
+            if (!dot.empty() && ((dot + 1) == oldext)) {
+                ret += ostd::slice_until(it, dot);
+                ret += '.';
+                ret += newext;
+            } else {
+                ret += it;
+            }
+        }
+        cs.result->set_str(ret.iter());
+        ret.disown();
+    });
 }

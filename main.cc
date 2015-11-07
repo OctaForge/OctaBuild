@@ -454,6 +454,29 @@ int main(int argc, char **argv) {
         }
     });
 
+    os.cs.add_command("extreplace", "sss", [](cscript::CsState &cs,
+                                              const char *lst,
+                                              const char *oldext,
+                                              const char *newext) {
+        String ret;
+        if (oldext[0] == '.') ++oldext;
+        if (newext[0] == '.') ++newext;
+        auto fnames = cscript::util::list_explode(lst);
+        for (ConstCharRange it: fnames.iter()) {
+            if (!ret.empty()) ret += ' ';
+            auto dot = ostd::find_last(it, '.');
+            if (!dot.empty() && ((dot + 1) == oldext)) {
+                ret += ostd::slice_until(it, dot);
+                ret += '.';
+                ret += newext;
+            } else {
+                ret += it;
+            }
+        }
+        cs.result->set_str(ret.iter());
+        ret.disown();
+    });
+
     os.cs.add_command("invoke", "s", [](CsState &cs, const char *name) {
         cs.result->set_int(((ObState &)cs).exec_main(name));
     });

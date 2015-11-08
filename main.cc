@@ -473,8 +473,7 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        cs.result->set_str(ret.iter());
-        ret.disown();
+        cs.result->set_str_dup(ret);
     });
 
     os.cs.add_command("invoke", "s", [](CsState &cs, const char *name) {

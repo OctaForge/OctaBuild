@@ -336,14 +336,16 @@ struct ObState {
     }
 };
 
+static ConstCharRange deffile = "obuild.cfg";
+
 static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
-    os.writeln("Usage: ", a0,  " [options] [target]\n",
+    os.writeln("Usage: ", a0,  " [options] [action]\n",
                "Options:\n"
                "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
-               "  -f FILE\tSpecify the file to run (default: obuild.cfg).\n"
+               "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
                "  -h\t\tPrint this message.\n"
                "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
-               "  -e STR\t\tEvaluate a string instead of a file.\n"
+               "  -e STR\tEvaluate a string instead of a file.\n"
                "  -E\t\tIgnore environment variables.");
     return v;
 }
@@ -369,7 +371,6 @@ int main(int argc, char **argv) {
     os.cs.add_ident(cscript::ID_VAR, "numcpus", INT_MAX, 1, &ncpus);
     os.cs.add_ident(cscript::ID_VAR, "numjobs", INT_MAX, 1, &os.jobs);
 
-    ConstCharRange fname = "obuild.cfg";
     ConstCharRange fcont;
 
     int ac;
@@ -380,7 +381,7 @@ int main(int argc, char **argv) {
                 return os.error(1, "failed changing directory: %s", optarg);
             break;
         case 'f':
-            fname = optarg;
+            deffile = optarg;
             break;
         case 'e':
             fcont = optarg;
@@ -482,7 +483,7 @@ int main(int argc, char **argv) {
 
     cs_register_globs(os.cs);
 
-    if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(fname))
+    if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(deffile))
         return os.error(1, "failed creating rules");
 
     if (os.rules.empty())

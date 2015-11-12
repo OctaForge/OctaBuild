@@ -40,6 +40,9 @@ Use the provided Makefile to build - adjust the paths to OctaSTD and
 libcubescript if necessary. There is a provided example build script
 in `example`.
 
+It's also possible to build OctaBuild with OctaBuild. There is a provided
+obuild.cfg in the main directory.
+
 The octabuild binary supports the `-h` option to display help.
 
 ## License

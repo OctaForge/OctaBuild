@@ -282,14 +282,10 @@ struct ObState {
                         return error(1, "redefinition of rule '%s'",
                                      target);
                     if (sub.size() < frule->sub.size()) {
-                        if (!frule)
-                            frule = &sr;
-                        else {
-                            *frule = sr;
-                            rlist.pop();
-                        }
+                        *frule = sr;
+                        rlist.pop();
                     }
-                }
+                } else frule = &sr;
             }
         }
         return 0;

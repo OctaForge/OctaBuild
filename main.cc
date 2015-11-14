@@ -316,8 +316,6 @@ struct ObState {
     void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body,
                   bool action = false) {
         auto targets = cscript::util::list_explode(tgt);
-        auto deps = dep ? cscript::util::list_explode(dep)
-                        : ostd::Vector<ostd::String>();
         for (auto &target: targets.iter()) {
             Rule &r = rules.push();
             r.target = target;
@@ -326,9 +324,24 @@ struct ObState {
                 r.func = body;
                 cscript::bcode_ref(body);
             }
-            for (auto &dep: deps.iter())
-                r.deps.push(dep);
+            r.deps = dep ? cscript::util::list_explode(dep)
+                         : ostd::Vector<ostd::String>();
         }
+    }
+
+    void rule_dup(const char *tgt, const char *ptgt, const char *dep) {
+        Rule *oldr = nullptr;
+        for (auto &rule: rules.iter())
+            if (ptgt == rule.target)
+                oldr = &rule;
+        if (!oldr)
+            return;
+        Rule &r = rules.push();
+        r.target = tgt;
+        r.action = oldr->action;
+        r.func = oldr->func;
+        r.deps = dep ? cscript::util::list_explode(dep)
+                     : ostd::Vector<ostd::String>();
     }
 };
 
@@ -420,11 +433,6 @@ int main(int argc, char **argv) {
         ((ObState &)cs).rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
     });
 
-    os.cs.add_command("rule-", "seN", [](CsState &cs, const char *tgt,
-                                         ostd::Uint32 *body, int *numargs) {
-        ((ObState &)cs).rule_add(tgt, nullptr, (*numargs > 1) ? body : nullptr);
-    });
-
     os.cs.add_command("action", "se", [](CsState &cs, const char *an,
                                          ostd::Uint32 *body) {
         ((ObState &)cs).rule_add(an, nullptr, body, true);
@@ -433,6 +441,11 @@ int main(int argc, char **argv) {
     os.cs.add_command("depend", "ss", [](CsState &cs, const char *file,
                                          const char *deps) {
         ((ObState &)cs).rule_add(file, deps, nullptr);
+    });
+
+    os.cs.add_command("duprule", "sss", [](CsState &cs, const char *tgt,
+                                           const char *ptgt, const char *dep) {
+        ((ObState &)cs).rule_dup(tgt, ptgt, dep);
     });
 
     os.cs.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {

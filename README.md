@@ -33,6 +33,7 @@ Upcoming features:
  * Proper argument handling
  * Platform related utilities
  * Rule pre-callbacks
+ * Option sets (configurations)
 
 ## Usage
 

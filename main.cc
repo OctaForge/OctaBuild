@@ -1,4 +1,3 @@
-#include <limits.h>
 #include <unistd.h>
 
 #include <ostd/types.hh>
@@ -377,8 +376,8 @@ int main(int argc, char **argv) {
     cscript::init_lib_list(os.cs);
 
     int ncpus = ostd::cpu_count_get();
-    os.cs.add_ident(cscript::ID_VAR, "numcpus", INT_MAX, 1, &ncpus);
-    os.cs.add_ident(cscript::ID_VAR, "numjobs", INT_MAX, 1, &os.jobs);
+    os.cs.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
+    os.cs.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
 
     ConstCharRange fcont;
 

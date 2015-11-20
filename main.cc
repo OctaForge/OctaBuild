@@ -339,8 +339,7 @@ struct ObState {
         r.target = tgt;
         r.action = oldr->action;
         r.func = oldr->func;
-        r.deps = dep ? cscript::util::list_explode(dep)
-                     : ostd::Vector<ostd::String>();
+        r.deps = dep ? cscript::util::list_explode(dep) : oldr->deps;
     }
 };
 
@@ -442,9 +441,10 @@ int main(int argc, char **argv) {
         ((ObState &)cs).rule_add(file, deps, nullptr);
     });
 
-    os.cs.add_command("duprule", "sss", [](CsState &cs, const char *tgt,
-                                           const char *ptgt, const char *dep) {
-        ((ObState &)cs).rule_dup(tgt, ptgt, dep);
+    os.cs.add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
+                                            const char *ptgt, const char *dep,
+                                            int *numargs) {
+        ((ObState &)cs).rule_dup(tgt, ptgt, (*numargs > 2) ? dep : nullptr);
     });
 
     os.cs.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {

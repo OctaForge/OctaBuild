@@ -108,7 +108,7 @@ struct ObState {
 
         Rule(): target(), deps(), func(nullptr), action(false) {}
         Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func),
-                             action(false) {
+                             action(r.action) {
             cscript::bcode_ref(func);
         }
         ~Rule() { cscript::bcode_unref(func); }
@@ -200,45 +200,45 @@ struct ObState {
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
-        if (!ret && ob_check_exec(tname, subdeps)) {
-            Uint32 *func = nullptr;
-            for (auto &sr: rlist.iter()) {
-                Rule &r = *sr.rule;
-                if (r.func) {
-                    func = r.func;
-                    break;
-                }
+        Uint32 *func = nullptr;
+        bool act = false;
+        for (auto &sr: rlist.iter()) {
+            Rule &r = *sr.rule;
+            if (r.func) {
+                func = r.func;
+                act = r.action;
+                break;
             }
-            if (func) {
-                StackedValue targetv, sourcev, sourcesv;
+        }
+        if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
+            StackedValue targetv, sourcev, sourcesv;
 
-                targetv.id = cs.new_ident("target");
-                if (!cscript::check_alias(targetv.id))
+            targetv.id = cs.new_ident("target");
+            if (!cscript::check_alias(targetv.id))
+                return 1;
+            targetv.set_cstr(tname);
+            targetv.push();
+
+            if (subdeps.size() > 0) {
+                sourcev.id = cs.new_ident("source");
+                sourcesv.id = cs.new_ident("sources");
+                if (!cscript::check_alias(sourcev.id))
                     return 1;
-                targetv.set_cstr(tname);
-                targetv.push();
+                if (!cscript::check_alias(sourcesv.id))
+                    return 1;
 
-                if (subdeps.size() > 0) {
-                    sourcev.id = cs.new_ident("source");
-                    sourcesv.id = cs.new_ident("sources");
-                    if (!cscript::check_alias(sourcev.id))
-                        return 1;
-                    if (!cscript::check_alias(sourcesv.id))
-                        return 1;
+                sourcev.set_cstr(subdeps[0]);
+                sourcev.push();
 
-                    sourcev.set_cstr(subdeps[0]);
-                    sourcev.push();
-
-                    auto dsv = ostd::appender<String>();
-                    ostd::concat(dsv, subdeps);
-                    ostd::Size len = dsv.size();
-                    sourcesv.set_str(ostd::CharRange(dsv.get().disown(),
-                                                     len));
-                    sourcesv.push();
-                }
-
-                return cs.run_int(func);
+                auto dsv = ostd::appender<String>();
+                ostd::concat(dsv, subdeps);
+                ostd::Size len = dsv.size();
+                sourcesv.set_str(ostd::CharRange(dsv.get().disown(),
+                                                 len));
+                sourcesv.push();
             }
+
+            return cs.run_int(func);
         }
         return ret;
     }

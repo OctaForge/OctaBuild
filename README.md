@@ -30,7 +30,6 @@ Upcoming features:
 
  * Automatic dependency tracking
  * Shell independence
- * Proper argument handling
  * Platform related utilities
  * Rule pre-callbacks
  * Option sets (configurations)

@@ -312,7 +312,7 @@ struct ObState {
         return wait_result([&target, this]() { return exec_rule(target); });
     }
 
-    void rule_add(const char *tgt, const char *dep, ostd::Uint32 *body,
+    void rule_add(ConstCharRange tgt, ConstCharRange dep, ostd::Uint32 *body,
                   bool action = false) {
         auto targets = cscript::util::list_explode(tgt);
         for (auto &target: targets.iter()) {

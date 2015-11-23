@@ -323,8 +323,7 @@ struct ObState {
                 r.func = body;
                 cscript::bcode_ref(body);
             }
-            r.deps = dep ? cscript::util::list_explode(dep)
-                         : ostd::Vector<ostd::String>();
+            r.deps = cscript::util::list_explode(dep);
         }
     }
 

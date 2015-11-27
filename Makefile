@@ -21,7 +21,7 @@ cubescript.o: $(CUBESCRIPT_PATH)/cubescript.cc
 clean:
 	rm -f $(FILES) obuild
 
-main.o: globs.hh tpool.hh
+main.o: globs.hh
 main.o: $(CUBESCRIPT_PATH)/cubescript.hh
 
 globs.o: globs.hh

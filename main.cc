@@ -519,12 +519,7 @@ int main(int argc, char **argv) {
     ObState os;
     ConstCharRange pn = argv[0];
     ConstCharRange lslash = ostd::find_last(pn, '/');
-    if (!lslash.empty()) {
-        lslash.pop_front();
-        os.progname = lslash;
-    } else {
-        os.progname = pn;
-    }
+    os.progname = lslash.empty() ? pn : (lslash + 1);
 
     cscript::init_lib_base(os.cs);
     cscript::init_lib_io(os.cs);

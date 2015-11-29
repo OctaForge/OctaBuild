@@ -20,8 +20,7 @@ https://github.com/OctaForge/OctaSTD.
 ## Features
 
  * A real scripting language
- * Similar to Make in many ways
- * Currently manual dependency tracking
+ * Make inspired with a similar style of dependency tracking
  * Parallel builds
  * Glob matching
  * GNU Make style pattern rules
@@ -31,8 +30,8 @@ Upcoming features:
  * Automatic dependency tracking
  * Shell independence
  * Platform related utilities
- * Rule pre-callbacks
- * Option sets (configurations)
+ * Configurations
+ * and others
 
 ## Usage
 

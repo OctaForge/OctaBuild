@@ -1,4 +1,3 @@
-#include <unistd.h>
 #include <pthread.h>
 
 #include <ostd/types.hh>
@@ -533,33 +532,40 @@ int main(int argc, char **argv) {
 
     ConstCharRange fcont;
 
-    int ac;
-    while ((ac = getopt(argc, argv, "C:f:hj:e:E")) >= 0) {
-        switch (ac) {
+    int posarg = argc;
+    for (int i = 1; i < argc; ++i) if (argv[i][0] == '-') {
+        char argn = argv[i][1];
+        if (argn == 'E') {
+            os.ignore_env = true;
+            continue;
+        } else if ((argn == 'h') || ((argv[i][2] == '\0') && ((i + 1) >= argc))) {
+            return ob_print_help(argv[0], (argn == 'h') ? ostd::out
+                                                        : ostd::err, 0);
+        }
+        const char *val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
+        switch (argn) {
         case 'C':
-            if (!ostd::directory_change(optarg))
-                return os.error(1, "failed changing directory: %s", optarg);
+            if (!ostd::directory_change(val))
+                return os.error(1, "failed changing directory: %s", val);
             break;
         case 'f':
-            deffile = optarg;
+            deffile = val;
             break;
         case 'e':
-            fcont = optarg;
+            fcont = val;
             break;
-        case 'h':
-            return ob_print_help(argv[0], ostd::out, 0);
         case 'j': {
-            int val = atoi(optarg);
-            if (!val) val = ncpus;
-            os.jobs = ostd::max(1, val);
+            int ival = atoi(val);
+            if (!ival) ival = ncpus;
+            os.jobs = ostd::max(1, ival);
             break;
         }
-        case 'E':
-            os.ignore_env = true;
-            break;
         default:
             return ob_print_help(argv[0], ostd::err, 1);
         }
+    } else {
+        posarg = i;
+        break;
     }
 
     tpool.init(os.jobs);
@@ -630,5 +636,5 @@ int main(int argc, char **argv) {
     if (os.rules.empty())
         return os.error(1, "no targets");
 
-    return os.exec_main((optind < argc) ? argv[optind] : "default");
+    return os.exec_main((posarg < argc) ? argv[posarg] : "default");
 }

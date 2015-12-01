@@ -538,11 +538,12 @@ int main(int argc, char **argv) {
         if (argn == 'E') {
             os.ignore_env = true;
             continue;
-        } else if ((argn == 'h') || ((argv[i][2] == '\0') && ((i + 1) >= argc))) {
-            return ob_print_help(argv[0], (argn == 'h') ? ostd::out
-                                                        : ostd::err, 0);
+        } else if (argn == 'h') {
+            return ob_print_help(argv[0], ostd::out, 0);
+        } else if (!argv[i][2] && ((i + 1) >= argc)) {
+            return ob_print_help(argv[0], ostd::err, 0);
         }
-        const char *val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
+        ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
         switch (argn) {
         case 'C':
             if (!ostd::directory_change(val))
@@ -555,7 +556,7 @@ int main(int argc, char **argv) {
             fcont = val;
             break;
         case 'j': {
-            int ival = atoi(val);
+            int ival = atoi(val.data());
             if (!ival) ival = ncpus;
             os.jobs = ostd::max(1, ival);
             break;

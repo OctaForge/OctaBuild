@@ -502,7 +502,8 @@ struct ObState {
 
 static ConstCharRange deffile = "obuild.cfg";
 
-static int ob_print_help(ConstCharRange a0, ostd::Stream &os, int v) {
+static int ob_print_help(ConstCharRange a0, bool err, int v) {
+    ostd::Stream &os = err ? ostd::err : ostd::out;
     os.writeln("Usage: ", a0,  " [options] [action]\n",
                "Options:\n"
                "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
@@ -538,10 +539,8 @@ int main(int argc, char **argv) {
         if (argn == 'E') {
             os.ignore_env = true;
             continue;
-        } else if (argn == 'h') {
-            return ob_print_help(argv[0], ostd::out, 0);
-        } else if (!argv[i][2] && ((i + 1) >= argc)) {
-            return ob_print_help(argv[0], ostd::err, 0);
+        } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
+            return ob_print_help(argv[0], argn != 'h', 0);
         }
         ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
         switch (argn) {
@@ -562,7 +561,7 @@ int main(int argc, char **argv) {
             break;
         }
         default:
-            return ob_print_help(argv[0], ostd::err, 1);
+            return ob_print_help(argv[0], true, 1);
         }
     } else {
         posarg = i;

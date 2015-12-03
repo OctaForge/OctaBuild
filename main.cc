@@ -226,6 +226,8 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
 
 static ThreadPool tpool;
 
+static ConstCharRange deffile = "obuild.cfg";
+
 struct ObState {
     CsState cs;
     ConstCharRange progname;
@@ -498,22 +500,20 @@ struct ObState {
             ((ObState &)cs).rule_dup(tgt, ptgt, dep, *numargs <= 2);
         });
     }
+
+    int print_help(bool err, int v) {
+        ostd::Stream &os = err ? ostd::err : ostd::out;
+        os.writeln("Usage: ", progname,  " [options] [action]\n",
+                   "Options:\n"
+                   "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
+                   "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
+                   "  -h\t\tPrint this message.\n"
+                   "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
+                   "  -e STR\tEvaluate a string instead of a file.\n"
+                   "  -E\t\tIgnore environment variables.");
+        return v;
+    }
 };
-
-static ConstCharRange deffile = "obuild.cfg";
-
-static int ob_print_help(ConstCharRange a0, bool err, int v) {
-    ostd::Stream &os = err ? ostd::err : ostd::out;
-    os.writeln("Usage: ", a0,  " [options] [action]\n",
-               "Options:\n"
-               "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
-               "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
-               "  -h\t\tPrint this message.\n"
-               "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
-               "  -e STR\tEvaluate a string instead of a file.\n"
-               "  -E\t\tIgnore environment variables.");
-    return v;
-}
 
 int main(int argc, char **argv) {
     ObState os;
@@ -540,7 +540,7 @@ int main(int argc, char **argv) {
             os.ignore_env = true;
             continue;
         } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-            return ob_print_help(argv[0], argn != 'h', 0);
+            return os.print_help(argn != 'h', 0);
         }
         ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
         switch (argn) {
@@ -561,7 +561,7 @@ int main(int argc, char **argv) {
             break;
         }
         default:
-            return ob_print_help(argv[0], true, 1);
+            return os.print_help(true, 1);
         }
     } else {
         posarg = i;

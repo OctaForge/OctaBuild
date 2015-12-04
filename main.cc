@@ -356,9 +356,10 @@ struct ObState {
 
             if (subdeps.size() > 0) {
                 sourcev.id = cs.new_ident("source");
-                sourcesv.id = cs.new_ident("sources");
                 if (!cscript::check_alias(sourcev.id))
                     return 1;
+
+                sourcesv.id = cs.new_ident("sources");
                 if (!cscript::check_alias(sourcesv.id))
                     return 1;
 

@@ -44,6 +44,9 @@ obuild.cfg in the main directory.
 
 The octabuild binary supports the `-h` option to display help.
 
+Keep in mind that the number of jobs is in addition to main thread (unlike
+Make, where it specifies the total number of threads).
+
 ## License
 
 See `COPYING.md`.

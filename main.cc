@@ -368,9 +368,7 @@ struct ObState {
 
                 auto dsv = ostd::appender<String>();
                 ostd::concat(dsv, subdeps);
-                ostd::Size len = dsv.size();
-                sourcesv.set_str(ostd::CharRange(dsv.get().disown(),
-                                                 len));
+                sourcesv.set_str_dup(dsv.get());
                 sourcesv.push();
             }
 

@@ -347,18 +347,18 @@ struct ObState: CsState {
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
             StackedValue targetv, sourcev, sourcesv;
 
-            targetv.id = this->new_ident("target");
+            targetv.id = new_ident("target");
             if (!cscript::check_alias(targetv.id))
                 return 1;
             targetv.set_cstr(tname);
             targetv.push();
 
             if (subdeps.size() > 0) {
-                sourcev.id = this->new_ident("source");
+                sourcev.id = new_ident("source");
                 if (!cscript::check_alias(sourcev.id))
                     return 1;
 
-                sourcesv.id = this->new_ident("sources");
+                sourcesv.id = new_ident("sources");
                 if (!cscript::check_alias(sourcesv.id))
                     return 1;
 
@@ -371,13 +371,13 @@ struct ObState: CsState {
                 sourcesv.push();
             }
 
-            return this->run_int(func);
+            return run_int(func);
         }
         return ret;
     }
 
     int exec_action(Rule *rule) {
-        return this->run_int(rule->func);
+        return run_int(rule->func);
     }
 
     int find_rules(ConstCharRange target, Vector<SubRule> &rlist) {
@@ -476,25 +476,25 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        this->add_command("rule", "sseN", [](CsState &cs, const char *tgt,
-                                             const char *dep, ostd::Uint32 *body,
-                                             int *numargs) {
+        add_command("rule", "sseN", [](CsState &cs, const char *tgt,
+                                       const char *dep, ostd::Uint32 *body,
+                                       int *numargs) {
             ((ObState &)cs).rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
         });
 
-        this->add_command("action", "se", [](CsState &cs, const char *an,
-                                             ostd::Uint32 *body) {
+        add_command("action", "se", [](CsState &cs, const char *an,
+                                       ostd::Uint32 *body) {
             ((ObState &)cs).rule_add(an, nullptr, body, true);
         });
 
-        this->add_command("depend", "ss", [](CsState &cs, const char *file,
-                                             const char *deps) {
+        add_command("depend", "ss", [](CsState &cs, const char *file,
+                                       const char *deps) {
             ((ObState &)cs).rule_add(file, deps, nullptr);
         });
 
-        this->add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
-                                                const char *ptgt, const char *dep,
-                                                int *numargs) {
+        add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
+                                          const char *ptgt, const char *dep,
+                                          int *numargs) {
             ((ObState &)cs).rule_dup(tgt, ptgt, dep, *numargs <= 2);
         });
     }

@@ -228,8 +228,7 @@ static ThreadPool tpool;
 
 static ConstCharRange deffile = "obuild.cfg";
 
-struct ObState {
-    CsState cs;
+struct ObState: CsState {
     ConstCharRange progname;
     int jobs = 1;
     bool ignore_env = false;
@@ -348,18 +347,18 @@ struct ObState {
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
             StackedValue targetv, sourcev, sourcesv;
 
-            targetv.id = cs.new_ident("target");
+            targetv.id = this->new_ident("target");
             if (!cscript::check_alias(targetv.id))
                 return 1;
             targetv.set_cstr(tname);
             targetv.push();
 
             if (subdeps.size() > 0) {
-                sourcev.id = cs.new_ident("source");
+                sourcev.id = this->new_ident("source");
                 if (!cscript::check_alias(sourcev.id))
                     return 1;
 
-                sourcesv.id = cs.new_ident("sources");
+                sourcesv.id = this->new_ident("sources");
                 if (!cscript::check_alias(sourcesv.id))
                     return 1;
 
@@ -372,13 +371,13 @@ struct ObState {
                 sourcesv.push();
             }
 
-            return cs.run_int(func);
+            return this->run_int(func);
         }
         return ret;
     }
 
     int exec_action(Rule *rule) {
-        return cs.run_int(rule->func);
+        return this->run_int(rule->func);
     }
 
     int find_rules(ConstCharRange target, Vector<SubRule> &rlist) {
@@ -477,25 +476,25 @@ struct ObState {
     }
 
     void register_rulecmds() {
-        cs.add_command("rule", "sseN", [](CsState &cs, const char *tgt,
-                                          const char *dep, ostd::Uint32 *body,
-                                          int *numargs) {
+        this->add_command("rule", "sseN", [](CsState &cs, const char *tgt,
+                                             const char *dep, ostd::Uint32 *body,
+                                             int *numargs) {
             ((ObState &)cs).rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
         });
 
-        cs.add_command("action", "se", [](CsState &cs, const char *an,
-                                          ostd::Uint32 *body) {
+        this->add_command("action", "se", [](CsState &cs, const char *an,
+                                             ostd::Uint32 *body) {
             ((ObState &)cs).rule_add(an, nullptr, body, true);
         });
 
-        cs.add_command("depend", "ss", [](CsState &cs, const char *file,
-                                          const char *deps) {
+        this->add_command("depend", "ss", [](CsState &cs, const char *file,
+                                             const char *deps) {
             ((ObState &)cs).rule_add(file, deps, nullptr);
         });
 
-        cs.add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
-                                             const char *ptgt, const char *dep,
-                                             int *numargs) {
+        this->add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
+                                                const char *ptgt, const char *dep,
+                                                int *numargs) {
             ((ObState &)cs).rule_dup(tgt, ptgt, dep, *numargs <= 2);
         });
     }
@@ -520,15 +519,15 @@ int main(int argc, char **argv) {
     ConstCharRange lslash = ostd::find_last(pn, '/');
     os.progname = lslash.empty() ? pn : (lslash + 1);
 
-    cscript::init_lib_base(os.cs);
-    cscript::init_lib_io(os.cs);
-    cscript::init_lib_math(os.cs);
-    cscript::init_lib_string(os.cs);
-    cscript::init_lib_list(os.cs);
+    cscript::init_lib_base(os);
+    cscript::init_lib_io(os);
+    cscript::init_lib_math(os);
+    cscript::init_lib_string(os);
+    cscript::init_lib_list(os);
 
     int ncpus = ostd::cpu_count_get();
-    os.cs.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
-    os.cs.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
+    os.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
+    os.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
 
     ConstCharRange fcont;
 
@@ -571,7 +570,7 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
-    os.cs.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
+    os.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
         auto cnt = ((ObState &)cs).counters.back();
         cnt->incr();
         String ds = s;
@@ -585,7 +584,7 @@ int main(int argc, char **argv) {
         cs.result->set_int(0);
     });
 
-    os.cs.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {
+    os.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {
         if (((ObState &)cs).ignore_env) {
             cs.result->set_cstr("");
             return;
@@ -601,10 +600,10 @@ int main(int argc, char **argv) {
         }
     });
 
-    os.cs.add_command("extreplace", "sss", [](cscript::CsState &cs,
-                                              const char *lst,
-                                              const char *oldext,
-                                              const char *newext) {
+    os.add_command("extreplace", "sss", [](cscript::CsState &cs,
+                                           const char *lst,
+                                           const char *oldext,
+                                           const char *newext) {
         String ret;
         if (oldext[0] == '.') ++oldext;
         if (newext[0] == '.') ++newext;
@@ -623,13 +622,13 @@ int main(int argc, char **argv) {
         cs.result->set_str_dup(ret);
     });
 
-    os.cs.add_command("invoke", "s", [](CsState &cs, const char *name) {
+    os.add_command("invoke", "s", [](CsState &cs, const char *name) {
         cs.result->set_int(((ObState &)cs).exec_main(name));
     });
 
-    cs_register_globs(os.cs);
+    cs_register_globs(os);
 
-    if ((!fcont.empty() && !os.cs.run_bool(fcont)) || !os.cs.run_file(deffile))
+    if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile))
         return os.error(1, "failed creating rules");
 
     if (os.rules.empty())

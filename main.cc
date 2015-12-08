@@ -476,26 +476,26 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        add_command("rule", "sseN", [](CsState &cs, const char *tgt,
+        add_command("rule", "sseN", [](ObState &os, const char *tgt,
                                        const char *dep, ostd::Uint32 *body,
                                        int *numargs) {
-            ((ObState &)cs).rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
+            os.rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
         });
 
-        add_command("action", "se", [](CsState &cs, const char *an,
+        add_command("action", "se", [](ObState &os, const char *an,
                                        ostd::Uint32 *body) {
-            ((ObState &)cs).rule_add(an, nullptr, body, true);
+            os.rule_add(an, nullptr, body, true);
         });
 
-        add_command("depend", "ss", [](CsState &cs, const char *file,
+        add_command("depend", "ss", [](ObState &os, const char *file,
                                        const char *deps) {
-            ((ObState &)cs).rule_add(file, deps, nullptr);
+            os.rule_add(file, deps, nullptr);
         });
 
-        add_command("duprule", "sssN", [](CsState &cs, const char *tgt,
+        add_command("duprule", "sssN", [](ObState &os, const char *tgt,
                                           const char *ptgt, const char *dep,
                                           int *numargs) {
-            ((ObState &)cs).rule_dup(tgt, ptgt, dep, *numargs <= 2);
+            os.rule_dup(tgt, ptgt, dep, *numargs <= 2);
         });
     }
 
@@ -570,8 +570,8 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
-    os.add_command("shell", "C", [](CsState &cs, ConstCharRange s) {
-        auto cnt = ((ObState &)cs).counters.back();
+    os.add_command("shell", "C", [](ObState &os, ConstCharRange s) {
+        auto cnt = os.counters.back();
         cnt->incr();
         String ds = s;
         /* in c++14 we can use generalized lambda captures to move the str */
@@ -581,22 +581,22 @@ int main(int argc, char **argv) {
                 cnt->result = ret;
             cnt->decr();
         });
-        cs.result->set_int(0);
+        os.result->set_int(0);
     });
 
-    os.add_commandn("getenv", "ss", [](CsState &cs, TvalRange args) {
-        if (((ObState &)cs).ignore_env) {
-            cs.result->set_cstr("");
+    os.add_commandn("getenv", "ss", [](ObState &os, TvalRange args) {
+        if (os.ignore_env) {
+            os.result->set_cstr("");
             return;
         }
         auto ret = ob_get_env(args[0].get_str());
         if (ret.empty()) {
             if (!args[1].get_str().empty())
-                cs.result->set_str_dup(args[1].get_str());
+                os.result->set_str_dup(args[1].get_str());
             else
-                cs.result->set_cstr("");
+                os.result->set_cstr("");
         } else {
-            cs.result->set_str_dup(ret);
+            os.result->set_str_dup(ret);
         }
     });
 
@@ -622,8 +622,8 @@ int main(int argc, char **argv) {
         cs.result->set_str_dup(ret);
     });
 
-    os.add_command("invoke", "s", [](CsState &cs, const char *name) {
-        cs.result->set_int(((ObState &)cs).exec_main(name));
+    os.add_command("invoke", "s", [](ObState &os, const char *name) {
+        os.result->set_int(os.exec_main(name));
     });
 
     cs_register_globs(os);

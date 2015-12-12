@@ -1,5 +1,5 @@
-#ifndef OCTABUILD_GLOBS_HH
-#define OCTABUILD_GLOBS_HH
+#ifndef OBUILD_GLOBS_HH
+#define OBUILD_GLOBS_HH
 
 #include <cubescript.hh>
 

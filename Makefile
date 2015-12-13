@@ -5,7 +5,7 @@ OCTASTD_PATH = ../octastd
 
 FILES = main.o globs.o cubescript.o
 
-OB_CXXFLAGS += -std=c++11 -I. -I$(CUBESCRIPT_PATH) -I$(OCTASTD_PATH) -pthread
+OB_CXXFLAGS += -std=c++14 -I. -I$(CUBESCRIPT_PATH) -I$(OCTASTD_PATH) -pthread
 
 all: obuild
 

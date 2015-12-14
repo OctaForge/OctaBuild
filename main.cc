@@ -207,9 +207,9 @@ static ConstCharRange ob_compare_subst(ConstCharRange expanded,
     if (expanded.slice(0, fp.size()) != fp)
         return nullptr;
     /* pop out front part */
-    expanded.pop_front_n(fp.size());
+    expanded += fp.size();
     /* part after % */
-    rep.pop_front();
+    ++rep;
     if (rep.empty())
         return expanded;
     /* part after % does not compare, so ignore */

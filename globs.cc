@@ -19,7 +19,7 @@ static void ob_get_path_parts(Vector<ConstCharRange> &parts,
             parts.push(ep);
         parts.push("*");
         elem = star;
-        elem.pop_front();
+        ++elem;
         star = ostd::find(elem, '*');
     }
     if (!elem.empty())
@@ -32,10 +32,10 @@ static bool ob_path_matches(ConstCharRange fn,
     while (!it.empty()) {
         ConstCharRange elem = it.front();
         if (elem == "*") {
-            it.pop_front();
+            ++it;
             /* skip multiple stars if present */
             while (!it.empty() && ((elem = it.front()) == "*"))
-                it.pop_front();
+                ++it;
             /* trailing stars, we match */
             if (it.empty())
                 return true;
@@ -43,7 +43,7 @@ static bool ob_path_matches(ConstCharRange fn,
             while (fn.size() > elem.size()) {
                 if (fn.slice(0, elem.size()) == elem)
                     break;
-                fn.pop_front();
+                ++fn;
             }
         }
         /* non-star here */
@@ -51,9 +51,9 @@ static bool ob_path_matches(ConstCharRange fn,
             return false;
         if (fn.slice(0, elem.size()) != elem)
             return false;
-        fn.pop_front_n(elem.size());
+        fn += elem.size();
         /* try next element */
-        it.pop_front();
+        ++it;
     }
     /* if there are no chars in the fname remaining, we fully matched */
     return fn.empty();
@@ -78,8 +78,7 @@ static bool ob_expand_dir(String &ret, ConstCharRange dir,
         /* if we reach this, we match; try recursively matching */
         if (!slash.empty()) {
             afn.append(slash);
-            ConstCharRange psl = slash;
-            psl.pop_front();
+            ConstCharRange psl = slash + 1;
             if (!ostd::find(psl, '*').empty()) {
                 if (!appended)
                     appended = ob_expand_glob(ret, afn.iter());
@@ -123,12 +122,10 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
     if (!slash.empty()) {
         /* there was slash, adjust directory + prefix accordingly */
         dir = slice_until(src, slash);
-        fnpre = slash;
-        fnpre.pop_front();
+        fnpre = slash + 1;
     }
     /* part after star */
-    ConstCharRange fnpost = star;
-    fnpost.pop_front();
+    ConstCharRange fnpost = star + 1;
     /* if a slash follows, adjust */
     ConstCharRange nslash = ostd::find(fnpost, '/');
     if (!nslash.empty())

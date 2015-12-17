@@ -28,8 +28,7 @@ static void ob_get_path_parts(Vector<ConstCharRange> &parts,
 
 static bool ob_path_matches(ConstCharRange fn,
                             const Vector<ConstCharRange> &parts) {
-    auto it = parts.iter();
-    while (!it.empty()) {
+    for (auto it = parts.iter(); !it.empty(); ++it) {
         ConstCharRange elem = it.front();
         if (elem == "*") {
             ++it;
@@ -52,8 +51,6 @@ static bool ob_path_matches(ConstCharRange fn,
         if (fn.slice(0, elem.size()) != elem)
             return false;
         fn += elem.size();
-        /* try next element */
-        ++it;
     }
     /* if there are no chars in the fname remaining, we fully matched */
     return fn.empty();

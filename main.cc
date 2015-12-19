@@ -331,12 +331,12 @@ struct ObState: CsState {
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
-        Uint32 *func = nullptr;
+        cscript::Bytecode *func = nullptr;
         bool act = false;
         for (auto &sr: rlist.iter()) {
             Rule &r = *sr.rule;
             if (r.func) {
-                func = r.func;
+                func = &r.func;
                 act = r.action;
                 break;
             }
@@ -364,7 +364,7 @@ struct ObState: CsState {
                 sourcesv.push();
             }
 
-            return run_int(func);
+            return run_int(*func);
         }
         return ret;
     }

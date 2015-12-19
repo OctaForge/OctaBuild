@@ -237,20 +237,12 @@ struct ObState: CsState {
     struct Rule {
         String target;
         Vector<String> deps;
-        Uint32 *func;
+        cscript::Bytecode func;
         bool action;
 
-        Rule(): target(), deps(), func(nullptr), action(false) {}
+        Rule(): target(), deps(), func(), action(false) {}
         Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func),
-                             action(r.action) {
-            cscript::bcode_ref(func);
-        }
-        ~Rule() { cscript::bcode_unref(func); }
-
-        void set_func(Uint32 *c) {
-            func = c;
-            cscript::bcode_ref(func);
-        }
+                             action(r.action) {}
     };
 
     Vector<Rule> rules;
@@ -453,7 +445,7 @@ struct ObState: CsState {
             Rule &r = rules.push();
             r.target = target;
             r.action = action;
-            r.set_func(body);
+            r.func = body;
             r.deps = cscript::util::list_explode(dep);
         }
     }
@@ -467,9 +459,9 @@ struct ObState: CsState {
         if (!oldr)
             return;
         Rule &r = rules.push();
-        r.set_func(oldr->func);
         r.target = tgt;
         r.action = oldr->action;
+        r.func = oldr->func;
         r.deps = inherit_deps ? oldr->deps : cscript::util::list_explode(dep);
     }
 

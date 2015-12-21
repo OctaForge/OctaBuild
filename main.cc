@@ -438,7 +438,7 @@ struct ObState: CsState {
         return wait_result([&target, this]() { return exec_rule(target); });
     }
 
-    void rule_add(ConstCharRange tgt, ConstCharRange dep, ostd::Uint32 *body,
+    void rule_add(ConstCharRange tgt, ConstCharRange dep, Uint32 *body,
                   bool action = false) {
         auto targets = cscript::util::list_explode(tgt);
         for (auto &target: targets.iter()) {
@@ -467,13 +467,13 @@ struct ObState: CsState {
 
     void register_rulecmds() {
         add_command("rule", "sseN", [](ObState &os, const char *tgt,
-                                       const char *dep, ostd::Uint32 *body,
+                                       const char *dep, Uint32 *body,
                                        int *numargs) {
             os.rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
         });
 
         add_command("action", "se", [](ObState &os, const char *an,
-                                       ostd::Uint32 *body) {
+                                       Uint32 *body) {
             os.rule_add(an, nullptr, body, true);
         });
 

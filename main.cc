@@ -489,8 +489,8 @@ struct ObState: CsState {
         });
     }
 
-    int print_help(bool err, int v) {
-        ostd::Stream &os = err ? ostd::err : ostd::out;
+    int print_help(int v) {
+        ostd::Stream &os = v ? ostd::err : ostd::out;
         os.writeln("Usage: ", progname,  " [options] [action]\n",
                    "Options:\n"
                    "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
@@ -528,7 +528,7 @@ int main(int argc, char **argv) {
             os.ignore_env = true;
             continue;
         } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-            return os.print_help(argn != 'h', 0);
+            return os.print_help(argn != 'h');
         }
         ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
         switch (argn) {
@@ -549,7 +549,7 @@ int main(int argc, char **argv) {
             break;
         }
         default:
-            return os.print_help(true, 1);
+            return os.print_help(1);
         }
     } else {
         posarg = i;

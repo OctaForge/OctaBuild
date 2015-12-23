@@ -24,6 +24,7 @@ using ostd::slice_until;
 using cscript::CsState;
 using cscript::TvalRange;
 using cscript::StackedValue;
+using cscript::Bytecode;
 
 /* thread pool */
 
@@ -160,10 +161,10 @@ private:
 /* check funcs */
 
 static bool ob_check_ts(ConstCharRange tname, const Vector<String> &deps) {
-    auto get_ts = [](ConstCharRange fname) -> time_t {
+    auto get_ts = [](ConstCharRange fname) {
         ostd::FileInfo fi(fname);
         if (fi.type() != ostd::FileType::regular)
-            return 0;
+            return time_t(0);
         return fi.mtime();
     };
     time_t tts = get_ts(tname);
@@ -237,7 +238,7 @@ struct ObState: CsState {
     struct Rule {
         String target;
         Vector<String> deps;
-        cscript::Bytecode func;
+        Bytecode func;
         bool action;
 
         Rule(): target(), deps(), func(), action(false) {}
@@ -315,7 +316,7 @@ struct ObState: CsState {
             if (!lp.empty()) {
                 repd.append(slice_until(atgt, lp));
                 repd.append(sr.sub);
-                lp.pop_front();
+                ++lp;
                 if (!lp.empty()) repd.append(lp);
                 atgt = repd.iter();
             }
@@ -331,7 +332,7 @@ struct ObState: CsState {
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
-        cscript::Bytecode *func = nullptr;
+        Bytecode *func = nullptr;
         bool act = false;
         for (auto &sr: rlist.iter()) {
             Rule &r = *sr.rule;
@@ -349,7 +350,7 @@ struct ObState: CsState {
             targetv.set_cstr(tname);
             targetv.push();
 
-            if (subdeps.size() > 0) {
+            if (!subdeps.empty()) {
                 if (!sourcev.alias(*this, "source"))
                     return 1;
                 if (!sourcesv.alias(*this, "sources"))

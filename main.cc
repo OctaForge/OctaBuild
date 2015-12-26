@@ -490,8 +490,8 @@ struct ObState: CsState {
         });
     }
 
-    int print_help(int v) {
-        ostd::Stream &os = v ? ostd::err : ostd::out;
+    int print_help(bool error) {
+        ostd::Stream &os = error ? ostd::err : ostd::out;
         os.writeln("Usage: ", progname,  " [options] [action]\n",
                    "Options:\n"
                    "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
@@ -500,7 +500,7 @@ struct ObState: CsState {
                    "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
                    "  -e STR\tEvaluate a string instead of a file.\n"
                    "  -E\t\tIgnore environment variables.");
-        return v;
+        return error;
     }
 };
 
@@ -550,7 +550,7 @@ int main(int argc, char **argv) {
             break;
         }
         default:
-            return os.print_help(1);
+            return os.print_help(true);
         }
     } else {
         posarg = i;

@@ -455,8 +455,10 @@ struct ObState: CsState {
                   bool inherit_deps) {
         Rule *oldr = nullptr;
         for (auto &rule: rules.iter())
-            if (ptgt == rule.target)
+            if (ptgt == rule.target) {
                 oldr = &rule;
+                break;
+            }
         if (!oldr)
             return;
         Rule &r = rules.push();

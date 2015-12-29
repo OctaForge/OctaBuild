@@ -334,13 +334,10 @@ struct ObState: CsState {
         });
         Bytecode *func = nullptr;
         bool act = false;
-        for (auto &sr: rlist.iter()) {
-            Rule &r = *sr.rule;
-            if (r.func) {
-                func = &r.func;
-                act = r.action;
-                break;
-            }
+        for (auto &sr: rlist.iter()) if (sr.rule->func) {
+            func = &sr.rule->func;
+            act = sr.rule->action;
+            break;
         }
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
             StackedValue targetv, sourcev, sourcesv;

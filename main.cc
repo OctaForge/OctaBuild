@@ -1,5 +1,3 @@
-#include <pthread.h>
-
 #include <ostd/types.hh>
 #include <ostd/functional.hh>
 #include <ostd/string.hh>
@@ -9,6 +7,9 @@
 #include <ostd/filesystem.hh>
 #include <ostd/platform.hh>
 #include <ostd/utility.hh>
+#include <ostd/thread.hh>
+#include <ostd/mutex.hh>
+#include <ostd/condition.hh>
 
 #include <cubescript.hh>
 
@@ -20,6 +21,10 @@ using ostd::Map;
 using ostd::String;
 using ostd::Uint32;
 using ostd::slice_until;
+using ostd::Thread;
+using ostd::UniqueLock;
+using ostd::Mutex;
+using ostd::Condition;
 
 using cscript::CsState;
 using cscript::TvalRange;
@@ -27,55 +32,6 @@ using cscript::StackedValue;
 using cscript::Bytecode;
 
 /* thread pool */
-
-struct Mutex {
-    Mutex() {
-        pthread_mutex_init(&mtx, nullptr);
-        locked = false;
-    }
-
-    ~Mutex() {
-        while (locked) unlock();
-        pthread_mutex_destroy(&mtx);
-    }
-
-    void lock() {
-        pthread_mutex_lock(&mtx);
-        locked = true;
-    }
-
-    void unlock() {
-        locked = false;
-        pthread_mutex_unlock(&mtx);
-    }
-
-    pthread_mutex_t mtx;
-    volatile bool locked;
-};
-
-struct Cond {
-    Cond() {
-        pthread_cond_init(&cnd, nullptr);
-    }
-
-    ~Cond() {
-        pthread_cond_destroy(&cnd);
-    }
-
-    void signal() {
-        pthread_cond_signal(&cnd);
-    }
-
-    void broadcast() {
-        pthread_cond_broadcast(&cnd);
-    }
-
-    void wait(Mutex &m) {
-        pthread_cond_wait(&cnd, &m.mtx);
-    }
-
-    pthread_cond_t cnd;
-};
 
 struct Task {
     ostd::Function<void()> cb;
@@ -98,10 +54,10 @@ struct ThreadPool {
     bool init(ostd::Size size) {
         running = true;
         for (ostd::Size i = 0; i < size; ++i) {
-            pthread_t tid;
-            if (pthread_create(&tid, nullptr, thr_func, this))
+            Thread tid([this]() { run(); });
+            if (!tid)
                 return false;
-            thrs.push(tid);
+            thrs.push(ostd::move(tid));
         }
         return true;
     }
@@ -111,27 +67,26 @@ struct ThreadPool {
         running = false;
         mtx.unlock();
         cond.broadcast();
-        for (pthread_t &tid: thrs.iter()) {
-            void *ret;
-            pthread_join(tid, &ret);
+        for (Thread &tid: thrs.iter()) {
+            tid.join();
             cond.broadcast();
         }
     }
 
     void run() {
         for (;;) {
-            mtx.lock();
+            UniqueLock<Mutex> l(mtx);
             while (running && (tasks == nullptr))
-                cond.wait(mtx);
+                cond.wait(l);
             if (!running) {
-                mtx.unlock();
-                pthread_exit(nullptr);
+                l.unlock();
+                ostd::this_thread::exit();
             }
             Task *t = tasks;
             tasks = t->next;
             if (last_task == t)
                 last_task = nullptr;
-            mtx.unlock();
+            l.unlock();
             t->cb();
             delete t;
         }
@@ -150,9 +105,9 @@ struct ThreadPool {
     }
 
 private:
-    Cond cond;
+    Condition cond;
     Mutex mtx;
-    Vector<pthread_t> thrs;
+    Vector<Thread> thrs;
     Task *tasks;
     Task *last_task;
     volatile bool running;
@@ -259,28 +214,25 @@ struct ObState: CsState {
         RuleCounter(): cond(), mtx(), counter(0), result(0) {}
 
         void wait() {
-            mtx.lock();
+            UniqueLock<Mutex> l(mtx);
             while (counter)
-                cond.wait(mtx);
-            mtx.unlock();
+                cond.wait(l);
         }
 
         void incr() {
-            mtx.lock();
+            UniqueLock<Mutex> l(mtx);
             ++counter;
-            mtx.unlock();
         }
 
         void decr() {
-            mtx.lock();
+            UniqueLock<Mutex> l(mtx);
             if (!--counter) {
-                mtx.unlock();
+                l.unlock();
                 cond.broadcast();
-            } else
-                mtx.unlock();
+            }
         }
 
-        Cond cond;
+        Condition cond;
         Mutex mtx;
         volatile int counter;
         ostd::AtomicInt result;

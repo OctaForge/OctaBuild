@@ -10,7 +10,7 @@ OB_CXXFLAGS += -std=c++14 -I. -I$(CUBESCRIPT_PATH) -I$(OCTASTD_PATH) -pthread
 all: obuild
 
 obuild: $(FILES)
-	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) $(LDFLAGS) -lstdthreads -o obuild $(FILES)
+	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) $(LDFLAGS) -o obuild $(FILES)
 
 .cc.o:
 	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) -c -o $@ $<

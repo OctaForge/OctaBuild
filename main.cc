@@ -468,7 +468,7 @@ int main(int argc, char **argv) {
     cscript::init_lib_string(os);
     cscript::init_lib_list(os);
 
-    int ncpus = ostd::cpu_count_get();
+    int ncpus = ostd::Thread::hardware_concurrency();
     os.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
     os.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
 

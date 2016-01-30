@@ -1,10 +1,10 @@
 # octabuild
 
-OctaBuild is a simple build system inspired by Make, but using the Cubescript
-language to write build definitions and not depending on a shell to function.
-It'll also feature things such as automatic dependency tracking and a large
-utility library abstracting away platform differences. Unlike Make, the program
-flow of OctaBuild is single threaded, offloading things such as compiler calls
+OctaBuild is a simple build system that uses the Cubescript language to write
+build definitions without depending on a shell to function. It'll also feature
+things such as automatic dependency tracking and a large utility library
+abstracting away platform differences. Unlike Make, the program flow of
+OctaBuild is single threaded, offloading things such as compiler calls
 into a thread pool. Therefore, things such as standard output are unaffected
 by threading.
 

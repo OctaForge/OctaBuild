@@ -13,7 +13,7 @@
 
 #include <cubescript.hh>
 
-#include "globs.hh"
+void cs_register_globs(cscript::CsState &cs);
 
 using ostd::ConstCharRange;
 using ostd::Vector;

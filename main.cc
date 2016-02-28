@@ -5,6 +5,7 @@
 #include <ostd/map.hh>
 #include <ostd/atomic.hh>
 #include <ostd/filesystem.hh>
+#include <ostd/io.hh>
 #include <ostd/platform.hh>
 #include <ostd/utility.hh>
 #include <ostd/thread.hh>
@@ -458,11 +459,7 @@ int main(int argc, char **argv) {
     ConstCharRange lslash = ostd::find_last(pn, '/');
     os.progname = lslash.empty() ? pn : (lslash + 1);
 
-    cscript::init_lib_base(os);
-    cscript::init_lib_io(os);
-    cscript::init_lib_math(os);
-    cscript::init_lib_string(os);
-    cscript::init_lib_list(os);
+    cscript::init_libs(os);
 
     int ncpus = ostd::Thread::hardware_concurrency();
     os.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);

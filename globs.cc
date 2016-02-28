@@ -2,8 +2,9 @@
 #include <ostd/string.hh>
 #include <ostd/vector.hh>
 #include <ostd/filesystem.hh>
+#include <ostd/io.hh>
 
-#include "globs.hh"
+#include <cubescript.hh>
 
 using ostd::ConstCharRange;
 using ostd::Vector;

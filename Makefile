@@ -1,4 +1,4 @@
-OB_CXXFLAGS = -g -Wall -Wextra -O2
+OB_CXXFLAGS = -g -Wall -Wextra -Wshadow -O2
 
 CUBESCRIPT_PATH = ../libcubescript
 OCTASTD_PATH = ../octastd

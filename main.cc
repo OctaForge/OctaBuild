@@ -37,7 +37,7 @@ using cscript::Bytecode;
 struct Task {
     ostd::Function<void()> cb;
     Task *next = nullptr;
-    Task(ostd::Function<void()> &&cb): cb(ostd::move(cb)) {}
+    Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
 };
 
 struct ThreadPool {
@@ -454,16 +454,16 @@ struct ObState: CsState {
 };
 
 int main(int argc, char **argv) {
-    ObState os;
+    ObState osv;
     ConstCharRange pn = argv[0];
     ConstCharRange lslash = ostd::find_last(pn, '/');
-    os.progname = lslash.empty() ? pn : (lslash + 1);
+    osv.progname = lslash.empty() ? pn : (lslash + 1);
 
-    cscript::init_libs(os);
+    cscript::init_libs(osv);
 
     int ncpus = ostd::Thread::hardware_concurrency();
-    os.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
-    os.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
+    osv.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
+    osv.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &osv.jobs);
 
     ConstCharRange fcont;
 
@@ -471,16 +471,16 @@ int main(int argc, char **argv) {
     for (int i = 1; i < argc; ++i) if (argv[i][0] == '-') {
         char argn = argv[i][1];
         if (argn == 'E') {
-            os.ignore_env = true;
+            osv.ignore_env = true;
             continue;
         } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-            return os.print_help(argn != 'h');
+            return osv.print_help(argn != 'h');
         }
         ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
         switch (argn) {
         case 'C':
             if (!ostd::directory_change(val))
-                return os.error(1, "failed changing directory: %s", val);
+                return osv.error(1, "failed changing directory: %s", val);
             break;
         case 'f':
             deffile = val;
@@ -491,22 +491,22 @@ int main(int argc, char **argv) {
         case 'j': {
             int ival = atoi(val.data());
             if (!ival) ival = ncpus;
-            os.jobs = ostd::max(1, ival);
+            osv.jobs = ostd::max(1, ival);
             break;
         }
         default:
-            return os.print_help(true);
+            return osv.print_help(true);
         }
     } else {
         posarg = i;
         break;
     }
 
-    tpool.init(os.jobs);
+    tpool.init(osv.jobs);
 
-    os.register_rulecmds();
+    osv.register_rulecmds();
 
-    os.add_command("shell", "C", [](ObState &os, ConstCharRange s) {
+    osv.add_command("shell", "C", [](ObState &os, ConstCharRange s) {
         auto cnt = os.counters.back();
         cnt->incr();
         tpool.push([cnt, ds = String(s)]() {
@@ -518,7 +518,7 @@ int main(int argc, char **argv) {
         os.result->set_int(0);
     });
 
-    os.add_commandn("getenv", "ss", [](ObState &os, TvalRange args) {
+    osv.add_commandn("getenv", "ss", [](ObState &os, TvalRange args) {
         if (os.ignore_env) {
             os.result->set_cstr("");
             return;
@@ -534,10 +534,10 @@ int main(int argc, char **argv) {
         }
     });
 
-    os.add_command("extreplace", "sss", [](cscript::CsState &cs,
-                                           const char *lst,
-                                           const char *oldext,
-                                           const char *newext) {
+    osv.add_command("extreplace", "sss", [](cscript::CsState &cs,
+                                            const char *lst,
+                                            const char *oldext,
+                                            const char *newext) {
         String ret;
         if (oldext[0] == '.') ++oldext;
         if (newext[0] == '.') ++newext;
@@ -556,17 +556,17 @@ int main(int argc, char **argv) {
         cs.result->set_str_dup(ret);
     });
 
-    os.add_command("invoke", "s", [](ObState &os, const char *name) {
+    osv.add_command("invoke", "s", [](ObState &os, const char *name) {
         os.result->set_int(os.exec_main(name));
     });
 
-    cs_register_globs(os);
+    cs_register_globs(osv);
 
-    if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile))
-        return os.error(1, "failed creating rules");
+    if ((!fcont.empty() && !osv.run_bool(fcont)) || !osv.run_file(deffile))
+        return osv.error(1, "failed creating rules");
 
-    if (os.rules.empty())
-        return os.error(1, "no targets");
+    if (osv.rules.empty())
+        return osv.error(1, "no targets");
 
-    return os.exec_main((posarg < argc) ? argv[posarg] : "default");
+    return osv.exec_main((posarg < argc) ? argv[posarg] : "default");
 }

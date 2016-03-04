@@ -149,8 +149,8 @@ static String ob_expand_globs(const Vector<String> &src) {
     return ret;
 }
 
-void cs_register_globs(cscript::CsState &cs) {
-    cs.add_command("glob", "C", [](cscript::CsState &cs, ConstCharRange lst) {
+void cs_register_globs(cscript::CsState &csv) {
+    csv.add_command("glob", "C", [](cscript::CsState &cs, ConstCharRange lst) {
         auto fnames = cscript::util::list_explode(lst);
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });

@@ -1,4 +1,5 @@
 *.o
 *.core
+*.so
 obuild
 obuild_ob

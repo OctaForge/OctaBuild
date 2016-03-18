@@ -8,6 +8,7 @@
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
 #include <ostd/utility.hh>
+#include <ostd/environ.hh>
 #include <ostd/thread.hh>
 #include <ostd/mutex.hh>
 #include <ostd/condition.hh>
@@ -523,14 +524,14 @@ int main(int argc, char **argv) {
             os.result->set_cstr("");
             return;
         }
-        auto ret = ConstCharRange(getenv(ostd::String(args[0].get_str()).data()));
-        if (ret.empty()) {
+        auto ret = ostd::environ::get(args[0].get_str());
+        if (!ret) {
             if (!args[1].get_str().empty())
                 os.result->set_str_dup(args[1].get_str());
             else
                 os.result->set_cstr("");
         } else {
-            os.result->set_str_dup(ret);
+            os.result->set_str_dup(ret.value());
         }
     });
 

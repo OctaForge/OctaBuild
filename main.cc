@@ -524,15 +524,8 @@ int main(int argc, char **argv) {
             os.result->set_cstr("");
             return;
         }
-        auto ret = ostd::environ::get(args[0].get_str());
-        if (!ret) {
-            if (!args[1].get_str().empty())
-                os.result->set_str_dup(args[1].get_str());
-            else
-                os.result->set_cstr("");
-        } else {
-            os.result->set_str_dup(ret.value());
-        }
+        os.result->set_str_dup(ostd::environ::get(args[0].get_str())
+            .value_or(args[1].get_str()));
     });
 
     osv.add_command("extreplace", "sss", [](cscript::CsState &cs,

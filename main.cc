@@ -38,7 +38,12 @@ using cscript::Bytecode;
 struct Task {
     ostd::Function<void()> cb;
     Task *next = nullptr;
+    Task() = delete;
+    Task(const Task &) = delete;
+    Task(Task &&) = delete;
     Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
+    Task &operator=(const Task &) = delete;
+    Task &operator=(Task &&) = delete;
 };
 
 struct ThreadPool {

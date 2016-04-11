@@ -35,17 +35,6 @@ using cscript::Bytecode;
 
 /* thread pool */
 
-struct Task {
-    ostd::Function<void()> cb;
-    Task *next = nullptr;
-    Task() = delete;
-    Task(const Task &) = delete;
-    Task(Task &&) = delete;
-    Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
-    Task &operator=(const Task &) = delete;
-    Task &operator=(Task &&) = delete;
-};
-
 struct ThreadPool {
     ThreadPool() {}
 
@@ -112,6 +101,17 @@ struct ThreadPool {
     }
 
 private:
+    struct Task {
+        ostd::Function<void()> cb;
+        Task *next = nullptr;
+        Task() = delete;
+        Task(const Task &) = delete;
+        Task(Task &&) = delete;
+        Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
+        Task &operator=(const Task &) = delete;
+        Task &operator=(Task &&) = delete;
+    };
+
     Condition cond;
     Mutex mtx;
     Vector<Thread> thrs;

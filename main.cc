@@ -529,7 +529,7 @@ int main(int argc, char **argv) {
             os.result->set_cstr("");
             return;
         }
-        os.result->set_str_dup(ostd::environ::get(args[0].get_str())
+        os.result->set_str_dup(ostd::env_get(args[0].get_str())
             .value_or(args[1].get_str()));
     });
 

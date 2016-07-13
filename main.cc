@@ -314,7 +314,7 @@ struct ObState: CsState {
 
                 auto dsv = ostd::appender<String>();
                 ostd::concat(dsv, subdeps);
-                sourcesv.set_str_dup(dsv.get());
+                sourcesv.set_str(ostd::move(dsv.get()));
                 sourcesv.push();
             }
 
@@ -529,8 +529,8 @@ int main(int argc, char **argv) {
             os.result->set_cstr("");
             return;
         }
-        os.result->set_str_dup(ostd::env_get(args[0].get_str())
-            .value_or(args[1].get_str()));
+        os.result->set_str(ostd::move(ostd::env_get(args[0].get_str())
+            .value_or(args[1].get_str())));
     });
 
     osv.add_command("extreplace", "sss", [](cscript::CsState &cs,
@@ -552,7 +552,7 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        cs.result->set_str_dup(ret);
+        cs.result->set_str(ostd::move(ret));
     });
 
     osv.add_command("invoke", "s", [](ObState &os, const char *name) {

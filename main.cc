@@ -422,26 +422,28 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        add_command("rule", "sseN", [](ObState &os, const char *tgt,
-                                       const char *dep, Uint32 *body,
-                                       int *numargs) {
-            os.rule_add(tgt, dep, (*numargs > 2) ? body : nullptr);
+        add_commandn("rule", "sseN", [](ObState &os, cscript::TvalRange args) {
+            auto tgt = args[0].get_str();
+            auto dep = args[1].get_str();
+            int nargs = args[3].get_int();
+            Uint32 *body = (nargs > 2) ? const_cast<Uint32 *>(args[2].code) : nullptr;
+            os.rule_add(tgt.iter(), dep.iter(), body);
         });
 
-        add_command("action", "se", [](ObState &os, const char *an,
-                                       Uint32 *body) {
-            os.rule_add(an, nullptr, body, true);
+        add_commandn("action", "se", [](ObState &os, cscript::TvalRange args) {
+            os.rule_add(args[0].get_str().iter(), nullptr,
+                const_cast<Uint32 *>(args[1].code), true);
         });
 
-        add_command("depend", "ss", [](ObState &os, const char *file,
-                                       const char *deps) {
-            os.rule_add(file, deps, nullptr);
+        add_commandn("depend", "ss", [](ObState &os, cscript::TvalRange args) {
+            os.rule_add(args[0].get_str().iter(), args[1].get_str().iter(), nullptr);
         });
 
-        add_command("duprule", "sssN", [](ObState &os, const char *tgt,
-                                          const char *ptgt, const char *dep,
-                                          int *numargs) {
-            os.rule_dup(tgt, ptgt, dep, *numargs <= 2);
+        add_commandn("duprule", "sssN", [](ObState &os, cscript::TvalRange args) {
+            auto tgt = args[0].get_str();
+            auto ptgt = args[1].get_str();
+            auto dep = args[2].get_str();
+            os.rule_dup(tgt.iter(), ptgt.iter(), dep.iter(), args[3].get_int() <= 2);
         });
     }
 

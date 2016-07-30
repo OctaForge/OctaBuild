@@ -423,26 +423,25 @@ struct ObState: CsState {
 
     void register_rulecmds() {
         add_commandn("rule", "sseN", [](ObState &os, cscript::TvalRange args) {
-            auto tgt = args[0].get_str();
-            auto dep = args[1].get_str();
-            int nargs = args[3].get_int();
-            Uint32 *body = (nargs > 2) ? args[2].get_code() : nullptr;
-            os.rule_add(tgt.iter(), dep.iter(), body);
+            os.rule_add(
+                args[0].get_strr(), args[1].get_strr(),
+                (args[3].get_int() > 2) ? args[2].get_code() : nullptr
+            );
         });
 
         add_commandn("action", "se", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(args[0].get_str().iter(), nullptr, args[1].get_code(), true);
+            os.rule_add(args[0].get_strr(), nullptr, args[1].get_code(), true);
         });
 
         add_commandn("depend", "ss", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(args[0].get_str().iter(), args[1].get_str().iter(), nullptr);
+            os.rule_add(args[0].get_strr(), args[1].get_str().iter(), nullptr);
         });
 
         add_commandn("duprule", "sssN", [](ObState &os, cscript::TvalRange args) {
-            auto tgt = args[0].get_str();
-            auto ptgt = args[1].get_str();
-            auto dep = args[2].get_str();
-            os.rule_dup(tgt.iter(), ptgt.iter(), dep.iter(), args[3].get_int() <= 2);
+            os.rule_dup(
+                args[0].get_strr(), args[1].get_strr(),
+                args[2].get_strr(), args[3].get_int() <= 2
+            );
         });
     }
 

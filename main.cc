@@ -426,13 +426,12 @@ struct ObState: CsState {
             auto tgt = args[0].get_str();
             auto dep = args[1].get_str();
             int nargs = args[3].get_int();
-            Uint32 *body = (nargs > 2) ? const_cast<Uint32 *>(args[2].code) : nullptr;
+            Uint32 *body = (nargs > 2) ? args[2].get_code() : nullptr;
             os.rule_add(tgt.iter(), dep.iter(), body);
         });
 
         add_commandn("action", "se", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(args[0].get_str().iter(), nullptr,
-                const_cast<Uint32 *>(args[1].code), true);
+            os.rule_add(args[0].get_str().iter(), nullptr, args[1].get_code(), true);
         });
 
         add_commandn("depend", "ss", [](ObState &os, cscript::TvalRange args) {

@@ -175,7 +175,7 @@ static String ob_expand_globs(Vector<String> const &src) {
 }
 
 void cs_register_globs(CsState &csv) {
-    csv.add_commandn("glob", "C", [](CsState &cs, TvalRange args) {
+    csv.add_command("glob", "C", [](CsState &cs, TvalRange args) {
         auto fnames = cscript::util::list_explode(args[0].get_strr());
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });

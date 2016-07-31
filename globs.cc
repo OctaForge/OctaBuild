@@ -11,6 +11,9 @@ using ostd::Vector;
 using ostd::String;
 using ostd::slice_until;
 
+using cscript::CsState;
+using cscript::TvalRange;
+
 static void ob_get_path_parts(
     Vector<ConstCharRange> &parts, ConstCharRange elem
 ) {
@@ -171,9 +174,9 @@ static String ob_expand_globs(Vector<String> const &src) {
     return ret;
 }
 
-void cs_register_globs(cscript::CsState &csv) {
-    csv.add_command("glob", "C", [](cscript::CsState &cs, ConstCharRange lst) {
-        auto fnames = cscript::util::list_explode(lst);
+void cs_register_globs(CsState &csv) {
+    csv.add_commandn("glob", "C", [](CsState &cs, TvalRange args) {
+        auto fnames = cscript::util::list_explode(args[0].get_strr());
         cs.result->set_str(ob_expand_globs(fnames).disown());
     });
 }

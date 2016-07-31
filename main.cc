@@ -571,10 +571,10 @@ int main(int argc, char **argv) {
 
     osv.register_rulecmds();
 
-    osv.add_command("shell", "C", [](ObState &os, ConstCharRange s) {
+    osv.add_commandn("shell", "C", [](ObState &os, TvalRange args) {
         auto cnt = os.counters.back();
         cnt->incr();
-        tpool.push([cnt, ds = String(s)]() {
+        tpool.push([cnt, ds = String(args[0].get_strr())]() {
             int ret = system(ds.data());
             if (ret && !cnt->result) {
                 cnt->result = ret;

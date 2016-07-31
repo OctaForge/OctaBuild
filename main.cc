@@ -594,16 +594,18 @@ int main(int argc, char **argv) {
         ));
     });
 
-    osv.add_command("extreplace", "sss", [](
-        cscript::CsState &cs, char const *lst,
-        char const *oldext, char const *newext
+    osv.add_commandn("extreplace", "sss", [](
+        ObState &os, TvalRange args
     ) {
+        ConstCharRange lst = args[0].get_strr();
+        ConstCharRange oldext = args[1].get_strr();
+        ConstCharRange newext = args[2].get_strr();
         String ret;
-        if (oldext[0] == '.') {
-            ++oldext;
+        if (oldext.front() == '.') {
+            oldext.pop_front();
         }
-        if (newext[0] == '.') {
-            ++newext;
+        if (newext.front() == '.') {
+            newext.pop_front();
         }
         auto fnames = cscript::util::list_explode(lst);
         for (ConstCharRange it: fnames.iter()) {
@@ -619,11 +621,11 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        cs.result->set_str(ostd::move(ret));
+        os.result->set_str(ostd::move(ret));
     });
 
-    osv.add_command("invoke", "s", [](ObState &os, char const *name) {
-        os.result->set_int(os.exec_main(name));
+    osv.add_commandn("invoke", "s", [](ObState &os, TvalRange args) {
+        os.result->set_int(os.exec_main(args[0].get_strr()));
     });
 
     cs_register_globs(osv);

@@ -39,11 +39,13 @@ struct ThreadPool {
     ThreadPool() {}
 
     ~ThreadPool() {
-        if (running) destroy();
+        if (running) {
+            destroy();
+        }
     }
 
     static void *thr_func(void *ptr) {
-        ((ThreadPool *)ptr)->run();
+        static_cast<ThreadPool *>(ptr)->run();
         return nullptr;
     }
 
@@ -51,8 +53,9 @@ struct ThreadPool {
         running = true;
         for (ostd::Size i = 0; i < size; ++i) {
             Thread tid([this]() { run(); });
-            if (!tid)
+            if (!tid) {
                 return false;
+            }
             thrs.push(ostd::move(tid));
         }
         return true;
@@ -72,16 +75,18 @@ struct ThreadPool {
     void run() {
         for (;;) {
             UniqueLock<Mutex> l(mtx);
-            while (running && (tasks == nullptr))
+            while (running && (tasks == nullptr)) {
                 cond.wait(l);
+            }
             if (!running) {
                 l.unlock();
                 ostd::this_thread::exit();
             }
             Task *t = tasks;
             tasks = t->next;
-            if (last_task == t)
+            if (last_task == t) {
                 last_task = nullptr;
+            }
             l.unlock();
             t->cb();
             delete t;
@@ -91,11 +96,13 @@ struct ThreadPool {
     void push(ostd::Function<void()> func) {
         mtx.lock();
         Task *t = new Task(ostd::move(func));
-        if (last_task)
+        if (last_task) {
             last_task->next = t;
+        }
         last_task = t;
-        if (!tasks)
+        if (!tasks) {
             tasks = t;
+        }
         cond.signal();
         mtx.unlock();
     }
@@ -105,10 +112,10 @@ private:
         ostd::Function<void()> cb;
         Task *next = nullptr;
         Task() = delete;
-        Task(const Task &) = delete;
+        Task(Task const &) = delete;
         Task(Task &&) = delete;
         Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
-        Task &operator=(const Task &) = delete;
+        Task &operator=(Task const &) = delete;
         Task &operator=(Task &&) = delete;
     };
 
@@ -117,23 +124,28 @@ private:
     Vector<Thread> thrs;
     Task *tasks;
     Task *last_task;
-    volatile bool running;
+    bool volatile running;
 };
 
 /* check funcs */
 
-static bool ob_check_ts(ConstCharRange tname, const Vector<String> &deps) {
+static bool ob_check_ts(ConstCharRange tname, Vector<String> const &deps) {
     auto get_ts = [](ConstCharRange fname) {
         ostd::FileInfo fi(fname);
-        if (fi.type() != ostd::FileType::regular)
+        if (fi.type() != ostd::FileType::regular) {
             return time_t(0);
+        }
         return fi.mtime();
     };
     time_t tts = get_ts(tname);
-    if (!tts) return true;
+    if (!tts) {
+        return true;
+    }
     for (auto &dep: deps.iter()) {
         time_t sts = get_ts(dep);
-        if (sts && (tts < sts)) return true;
+        if (sts && (tts < sts)) {
+            return true;
+        }
     }
     return false;
 }
@@ -142,41 +154,51 @@ static bool ob_check_file(ConstCharRange fname) {
     return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
-static bool ob_check_exec(ConstCharRange tname, const Vector<String> &deps) {
-    if (!ob_check_file(tname))
+static bool ob_check_exec(ConstCharRange tname, Vector<String> const &deps) {
+    if (!ob_check_file(tname)) {
         return true;
-    for (auto &dep: deps.iter())
-        if (!ob_check_file(dep))
+    }
+    for (auto &dep: deps.iter()) {
+        if (!ob_check_file(dep)) {
             return true;
+        }
+    }
     return ob_check_ts(tname, deps);
 }
 
 /* this lets us properly match % patterns in target names */
-static ConstCharRange ob_compare_subst(ConstCharRange expanded,
-                                       ConstCharRange toexpand) {
+static ConstCharRange ob_compare_subst(
+    ConstCharRange expanded, ConstCharRange toexpand
+) {
     auto rep = ostd::find(toexpand, '%');
     /* no subst found */
-    if (rep.empty())
+    if (rep.empty()) {
         return nullptr;
+    }
     /* get the part before % */
     auto fp = slice_until(toexpand, rep);
     /* part before % does not compare, so ignore */
-    if (expanded.size() <= fp.size())
+    if (expanded.size() <= fp.size()) {
         return nullptr;
-    if (expanded.slice(0, fp.size()) != fp)
+    }
+    if (expanded.slice(0, fp.size()) != fp) {
         return nullptr;
+    }
     /* pop out front part */
     expanded += fp.size();
     /* part after % */
     ++rep;
-    if (rep.empty())
+    if (rep.empty()) {
         return expanded;
+    }
     /* part after % does not compare, so ignore */
-    if (expanded.size() <= rep.size())
+    if (expanded.size() <= rep.size()) {
         return nullptr;
+    }
     ostd::Size es = expanded.size();
-    if (expanded.slice(es - rep.size(), es) != rep)
+    if (expanded.slice(es - rep.size(), es) != rep) {
         return nullptr;
+    }
     /* cut off latter part */
     expanded.pop_back_n(rep.size());
     /* we got what we wanted... */
@@ -200,8 +222,9 @@ struct ObState: CsState {
         bool action;
 
         Rule(): target(), deps(), func(), action(false) {}
-        Rule(const Rule &r): target(r.target), deps(r.deps), func(r.func),
-                             action(r.action) {}
+        Rule(Rule const &r):
+            target(r.target), deps(r.deps), func(r.func), action(r.action)
+        {}
     };
 
     Vector<Rule> rules;
@@ -218,8 +241,9 @@ struct ObState: CsState {
 
         void wait() {
             UniqueLock<Mutex> l(mtx);
-            while (counter)
+            while (counter) {
                 cond.wait(l);
+            }
         }
 
         void incr() {
@@ -237,7 +261,7 @@ struct ObState: CsState {
 
         Condition cond;
         Mutex mtx;
-        volatile int counter;
+        int volatile counter;
         ostd::AtomicInt result;
     };
 
@@ -249,7 +273,9 @@ struct ObState: CsState {
         counters.push(&ctr);
         int ret = func();
         counters.pop();
-        if (ret) return ret;
+        if (ret) {
+            return ret;
+        }
         ctr.wait();
         return ctr.result;
     }
@@ -261,8 +287,10 @@ struct ObState: CsState {
         return retcode;
     }
 
-    int exec_list(const Vector<SubRule> &rlist, Vector<String> &subdeps,
-                  ConstCharRange tname) {
+    int exec_list(
+        Vector<SubRule> const &rlist, Vector<String> &subdeps,
+        ConstCharRange tname
+    ) {
         String repd;
         for (auto &sr: rlist.iter()) for (auto &target: sr.rule->deps.iter()) {
             ConstCharRange atgt = target.iter();
@@ -272,42 +300,51 @@ struct ObState: CsState {
                 repd.append(slice_until(atgt, lp));
                 repd.append(sr.sub);
                 ++lp;
-                if (!lp.empty()) repd.append(lp);
+                if (!lp.empty()) {
+                    repd.append(lp);
+                }
                 atgt = repd.iter();
             }
             subdeps.push(atgt);
             int r = exec_rule(atgt, tname);
-            if (r) return r;
+            if (r) {
+                return r;
+            }
         }
         return 0;
     }
 
-    int exec_func(ConstCharRange tname, const Vector<SubRule> &rlist) {
+    int exec_func(ConstCharRange tname, Vector<SubRule> const &rlist) {
         Vector<String> subdeps;
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
         Bytecode *func = nullptr;
         bool act = false;
-        for (auto &sr: rlist.iter()) if (sr.rule->func) {
-            func = &sr.rule->func;
-            act = sr.rule->action;
-            break;
+        for (auto &sr: rlist.iter()) {
+            if (sr.rule->func) {
+                func = &sr.rule->func;
+                act = sr.rule->action;
+                break;
+            }
         }
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
             StackedValue targetv, sourcev, sourcesv;
             CsState &cs = *this;
 
-            if (!targetv.alias(cs, "target"))
+            if (!targetv.alias(cs, "target")) {
                 return 1;
+            }
             targetv.set_cstr(tname);
             targetv.push();
 
             if (!subdeps.empty()) {
-                if (!sourcev.alias(cs, "source"))
+                if (!sourcev.alias(cs, "source")) {
                     return 1;
-                if (!sourcesv.alias(cs, "sources"))
+                }
+                if (!sourcesv.alias(cs, "sources")) {
                     return 1;
+                }
 
                 sourcev.set_cstr(subdeps[0]);
                 sourcev.push();
@@ -328,20 +365,21 @@ struct ObState: CsState {
     }
 
     int find_rules(ConstCharRange target, Vector<SubRule> &rlist) {
-        if (!rlist.empty())
+        if (!rlist.empty()) {
             return 0;
+        }
         SubRule *frule = nullptr;
         bool exact = false;
         for (auto &rule: rules.iter()) {
             if (target == rule.target) {
                 rlist.push().rule = &rule;
                 if (rule.func) {
-                    if (frule && exact)
-                        return error(1, "redefinition of rule '%s'",
-                                     target);
-                    if (!frule)
+                    if (frule && exact) {
+                        return error(1, "redefinition of rule '%s'", target);
+                    }
+                    if (!frule) {
                         frule = &rlist.back();
-                    else {
+                    } else {
                         *frule = rlist.back();
                         rlist.pop();
                     }
@@ -349,22 +387,25 @@ struct ObState: CsState {
                 }
                 continue;
             }
-            if (exact || !rule.func)
+            if (exact || !rule.func) {
                 continue;
+            }
             ConstCharRange sub = ob_compare_subst(target, rule.target);
             if (!sub.empty()) {
                 SubRule &sr = rlist.push();
                 sr.rule = &rule;
                 sr.sub = sub;
                 if (frule) {
-                    if (sub.size() == frule->sub.size())
-                        return error(1, "redefinition of rule '%s'",
-                                     target);
+                    if (sub.size() == frule->sub.size()) {
+                        return error(1, "redefinition of rule '%s'", target);
+                    }
                     if (sub.size() < frule->sub.size()) {
                         *frule = sr;
                         rlist.pop();
                     }
-                } else frule = &sr;
+                } else {
+                    frule = &sr;
+                }
             }
         }
         return 0;
@@ -373,16 +414,21 @@ struct ObState: CsState {
     int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
         Vector<SubRule> &rlist = cache[target];
         int fret = find_rules(target, rlist);
-        if (fret)
+        if (fret) {
             return fret;
-        if ((rlist.size() == 1) && rlist[0].rule->action)
+        }
+        if ((rlist.size() == 1) && rlist[0].rule->action) {
             return exec_action(rlist[0].rule);
+        }
         if (rlist.empty() && !ob_check_file(target)) {
-            if (from.empty())
+            if (from.empty()) {
                 return error(1, "no rule to run target '%s'", target);
-            else
-                return error(1, "no rule to run target '%s' (needed by '%s')",
-                             target, from);
+            } else {
+                return error(
+                    1, "no rule to run target '%s' (needed by '%s')",
+                    target, from
+                );
+            }
             return 1;
         }
         return exec_func(target, rlist);
@@ -392,8 +438,10 @@ struct ObState: CsState {
         return wait_result([&target, this]() { return exec_rule(target); });
     }
 
-    void rule_add(ConstCharRange tgt, ConstCharRange dep, Uint32 *body,
-                  bool action = false) {
+    void rule_add(
+        ConstCharRange tgt, ConstCharRange dep, Uint32 *body,
+        bool action = false
+    ) {
         auto targets = cscript::util::list_explode(tgt);
         for (auto &target: targets.iter()) {
             Rule &r = rules.push();
@@ -404,16 +452,20 @@ struct ObState: CsState {
         }
     }
 
-    void rule_dup(ConstCharRange tgt, ConstCharRange ptgt, ConstCharRange dep,
-                  bool inherit_deps) {
+    void rule_dup(
+        ConstCharRange tgt, ConstCharRange ptgt, ConstCharRange dep,
+        bool inherit_deps
+    ) {
         Rule *oldr = nullptr;
-        for (auto &rule: rules.iter())
+        for (auto &rule: rules.iter()) {
             if (ptgt == rule.target) {
                 oldr = &rule;
                 break;
             }
-        if (!oldr)
+        }
+        if (!oldr) {
             return;
+        }
         Rule &r = rules.push();
         r.target = tgt;
         r.action = oldr->action;
@@ -447,14 +499,16 @@ struct ObState: CsState {
 
     int print_help(bool error) {
         ostd::Stream &os = error ? ostd::err : ostd::out;
-        os.writeln("Usage: ", progname,  " [options] [action]\n",
-                   "Options:\n"
-                   "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
-                   "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
-                   "  -h\t\tPrint this message.\n"
-                   "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
-                   "  -e STR\tEvaluate a string instead of a file.\n"
-                   "  -E\t\tIgnore environment variables.");
+        os.writeln(
+            "Usage: ", progname,  " [options] [action]\n",
+            "Options:\n"
+            "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
+            "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
+            "  -h\t\tPrint this message.\n"
+            "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
+            "  -e STR\tEvaluate a string instead of a file.\n"
+            "  -E\t\tIgnore environment variables."
+        );
         return error;
     }
 };
@@ -474,38 +528,43 @@ int main(int argc, char **argv) {
     ConstCharRange fcont;
 
     int posarg = argc;
-    for (int i = 1; i < argc; ++i) if (argv[i][0] == '-') {
-        char argn = argv[i][1];
-        if (argn == 'E') {
-            osv.ignore_env = true;
-            continue;
-        } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-            return osv.print_help(argn != 'h');
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i][0] == '-') {
+            char argn = argv[i][1];
+            if (argn == 'E') {
+                osv.ignore_env = true;
+                continue;
+            } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
+                return osv.print_help(argn != 'h');
+            }
+            ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
+            switch (argn) {
+            case 'C':
+                if (!ostd::directory_change(val)) {
+                    return osv.error(1, "failed changing directory: %s", val);
+                }
+                break;
+            case 'f':
+                deffile = val;
+                break;
+            case 'e':
+                fcont = val;
+                break;
+            case 'j': {
+                int ival = atoi(val.data());
+                if (!ival) {
+                    ival = ncpus;
+                }
+                osv.jobs = ostd::max(1, ival);
+                break;
+            }
+            default:
+                return osv.print_help(true);
+            }
+        } else {
+            posarg = i;
+            break;
         }
-        ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
-        switch (argn) {
-        case 'C':
-            if (!ostd::directory_change(val))
-                return osv.error(1, "failed changing directory: %s", val);
-            break;
-        case 'f':
-            deffile = val;
-            break;
-        case 'e':
-            fcont = val;
-            break;
-        case 'j': {
-            int ival = atoi(val.data());
-            if (!ival) ival = ncpus;
-            osv.jobs = ostd::max(1, ival);
-            break;
-        }
-        default:
-            return osv.print_help(true);
-        }
-    } else {
-        posarg = i;
-        break;
     }
 
     tpool.init(osv.jobs);
@@ -517,8 +576,9 @@ int main(int argc, char **argv) {
         cnt->incr();
         tpool.push([cnt, ds = String(s)]() {
             int ret = system(ds.data());
-            if (ret && !cnt->result)
+            if (ret && !cnt->result) {
                 cnt->result = ret;
+            }
             cnt->decr();
         });
         os.result->set_int(0);
@@ -529,20 +589,27 @@ int main(int argc, char **argv) {
             os.result->set_cstr("");
             return;
         }
-        os.result->set_str(ostd::move(ostd::env_get(args[0].get_str())
-            .value_or(args[1].get_str())));
+        os.result->set_str(ostd::move(
+            ostd::env_get(args[0].get_str()).value_or(args[1].get_str())
+        ));
     });
 
-    osv.add_command("extreplace", "sss", [](cscript::CsState &cs,
-                                            const char *lst,
-                                            const char *oldext,
-                                            const char *newext) {
+    osv.add_command("extreplace", "sss", [](
+        cscript::CsState &cs, char const *lst,
+        char const *oldext, char const *newext
+    ) {
         String ret;
-        if (oldext[0] == '.') ++oldext;
-        if (newext[0] == '.') ++newext;
+        if (oldext[0] == '.') {
+            ++oldext;
+        }
+        if (newext[0] == '.') {
+            ++newext;
+        }
         auto fnames = cscript::util::list_explode(lst);
         for (ConstCharRange it: fnames.iter()) {
-            if (!ret.empty()) ret += ' ';
+            if (!ret.empty()) {
+                ret += ' ';
+            }
             auto dot = ostd::find_last(it, '.');
             if (!dot.empty() && ((dot + 1) == oldext)) {
                 ret += ostd::slice_until(it, dot);
@@ -555,17 +622,19 @@ int main(int argc, char **argv) {
         cs.result->set_str(ostd::move(ret));
     });
 
-    osv.add_command("invoke", "s", [](ObState &os, const char *name) {
+    osv.add_command("invoke", "s", [](ObState &os, char const *name) {
         os.result->set_int(os.exec_main(name));
     });
 
     cs_register_globs(osv);
 
-    if ((!fcont.empty() && !osv.run_bool(fcont)) || !osv.run_file(deffile))
+    if ((!fcont.empty() && !osv.run_bool(fcont)) || !osv.run_file(deffile)) {
         return osv.error(1, "failed creating rules");
+    }
 
-    if (osv.rules.empty())
+    if (osv.rules.empty()) {
         return osv.error(1, "no targets");
+    }
 
     return osv.exec_main((posarg < argc) ? argv[posarg] : "default");
 }

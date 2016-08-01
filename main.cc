@@ -207,8 +207,6 @@ static ConstCharRange ob_compare_subst(
 
 static ThreadPool tpool;
 
-static ConstCharRange deffile = "obuild.cfg";
-
 struct ObState: CsState {
     ConstCharRange progname;
     int jobs = 1;
@@ -497,7 +495,7 @@ struct ObState: CsState {
         });
     }
 
-    int print_help(bool error) {
+    int print_help(bool error, ConstCharRange deffile) {
         ostd::Stream &os = error ? ostd::err : ostd::out;
         os.writeln(
             "Usage: ", progname,  " [options] [action]\n",
@@ -526,6 +524,7 @@ int main(int argc, char **argv) {
     os.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
 
     ConstCharRange fcont;
+    ConstCharRange deffile = "obuild.cfg";
 
     int posarg = argc;
     for (int i = 1; i < argc; ++i) {
@@ -535,7 +534,7 @@ int main(int argc, char **argv) {
                 os.ignore_env = true;
                 continue;
             } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-                return os.print_help(argn != 'h');
+                return os.print_help(argn != 'h', deffile);
             }
             ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
             switch (argn) {
@@ -559,7 +558,7 @@ int main(int argc, char **argv) {
                 break;
             }
             default:
-                return os.print_help(true);
+                return os.print_help(true, deffile);
             }
         } else {
             posarg = i;

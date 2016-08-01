@@ -474,23 +474,23 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        add_command("rule", "sseN", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(
+        add_command("rule", "sseN", [this](CsState &, cscript::TvalRange args) {
+            rule_add(
                 args[0].get_strr(), args[1].get_strr(),
                 (args[3].get_int() > 2) ? args[2].get_code() : nullptr
             );
         });
 
-        add_command("action", "se", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(args[0].get_strr(), nullptr, args[1].get_code(), true);
+        add_command("action", "se", [this](CsState &, cscript::TvalRange args) {
+            rule_add(args[0].get_strr(), nullptr, args[1].get_code(), true);
         });
 
-        add_command("depend", "ss", [](ObState &os, cscript::TvalRange args) {
-            os.rule_add(args[0].get_strr(), args[1].get_str().iter(), nullptr);
+        add_command("depend", "ss", [this](CsState &, cscript::TvalRange args) {
+            rule_add(args[0].get_strr(), args[1].get_str().iter(), nullptr);
         });
 
-        add_command("duprule", "sssN", [](ObState &os, cscript::TvalRange args) {
-            os.rule_dup(
+        add_command("duprule", "sssN", [this](CsState &, cscript::TvalRange args) {
+            rule_dup(
                 args[0].get_strr(), args[1].get_strr(),
                 args[2].get_strr(), args[3].get_int() <= 2
             );
@@ -514,16 +514,16 @@ struct ObState: CsState {
 };
 
 int main(int argc, char **argv) {
-    ObState osv;
+    ObState os;
     ConstCharRange pn = argv[0];
     ConstCharRange lslash = ostd::find_last(pn, '/');
-    osv.progname = lslash.empty() ? pn : (lslash + 1);
+    os.progname = lslash.empty() ? pn : (lslash + 1);
 
-    cscript::init_libs(osv);
+    cscript::init_libs(os);
 
     int ncpus = ostd::Thread::hardware_concurrency();
-    osv.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
-    osv.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &osv.jobs);
+    os.add_ident(cscript::ID_VAR, "numcpus", 4096, 1, &ncpus);
+    os.add_ident(cscript::ID_VAR, "numjobs", 4096, 1, &os.jobs);
 
     ConstCharRange fcont;
 
@@ -532,16 +532,16 @@ int main(int argc, char **argv) {
         if (argv[i][0] == '-') {
             char argn = argv[i][1];
             if (argn == 'E') {
-                osv.ignore_env = true;
+                os.ignore_env = true;
                 continue;
             } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-                return osv.print_help(argn != 'h');
+                return os.print_help(argn != 'h');
             }
             ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
             switch (argn) {
             case 'C':
                 if (!ostd::directory_change(val)) {
-                    return osv.error(1, "failed changing directory: %s", val);
+                    return os.error(1, "failed changing directory: %s", val);
                 }
                 break;
             case 'f':
@@ -555,11 +555,11 @@ int main(int argc, char **argv) {
                 if (!ival) {
                     ival = ncpus;
                 }
-                osv.jobs = ostd::max(1, ival);
+                os.jobs = ostd::max(1, ival);
                 break;
             }
             default:
-                return osv.print_help(true);
+                return os.print_help(true);
             }
         } else {
             posarg = i;
@@ -567,11 +567,11 @@ int main(int argc, char **argv) {
         }
     }
 
-    tpool.init(osv.jobs);
+    tpool.init(os.jobs);
 
-    osv.register_rulecmds();
+    os.register_rulecmds();
 
-    osv.add_command("shell", "C", [](ObState &os, TvalRange args) {
+    os.add_command("shell", "C", [&os](CsState &cs, TvalRange args) {
         auto cnt = os.counters.back();
         cnt->incr();
         tpool.push([cnt, ds = String(args[0].get_strr())]() {
@@ -581,21 +581,21 @@ int main(int argc, char **argv) {
             }
             cnt->decr();
         });
-        os.result->set_int(0);
+        cs.result->set_int(0);
     });
 
-    osv.add_command("getenv", "ss", [](ObState &os, TvalRange args) {
+    os.add_command("getenv", "ss", [&os](CsState &cs, TvalRange args) {
         if (os.ignore_env) {
-            os.result->set_cstr("");
+            cs.result->set_cstr("");
             return;
         }
-        os.result->set_str(ostd::move(
+        cs.result->set_str(ostd::move(
             ostd::env_get(args[0].get_str()).value_or(args[1].get_str())
         ));
     });
 
-    osv.add_command("extreplace", "sss", [](
-        ObState &os, TvalRange args
+    os.add_command("extreplace", "sss", [&os](
+        CsState &cs, TvalRange args
     ) {
         ConstCharRange lst = args[0].get_strr();
         ConstCharRange oldext = args[1].get_strr();
@@ -621,22 +621,22 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        os.result->set_str(ostd::move(ret));
+        cs.result->set_str(ostd::move(ret));
     });
 
-    osv.add_command("invoke", "s", [](ObState &os, TvalRange args) {
-        os.result->set_int(os.exec_main(args[0].get_strr()));
+    os.add_command("invoke", "s", [&os](CsState &cs, TvalRange args) {
+        cs.result->set_int(os.exec_main(args[0].get_strr()));
     });
 
-    cs_register_globs(osv);
+    cs_register_globs(os);
 
-    if ((!fcont.empty() && !osv.run_bool(fcont)) || !osv.run_file(deffile)) {
-        return osv.error(1, "failed creating rules");
+    if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {
+        return os.error(1, "failed creating rules");
     }
 
-    if (osv.rules.empty()) {
-        return osv.error(1, "no targets");
+    if (os.rules.empty()) {
+        return os.error(1, "no targets");
     }
 
-    return osv.exec_main((posarg < argc) ? argv[posarg] : "default");
+    return os.exec_main((posarg < argc) ? argv[posarg] : "default");
 }

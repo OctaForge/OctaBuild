@@ -357,23 +357,25 @@ private:
         ConstCharRange tname
     ) {
         String repd;
-        for (auto &sr: rlist.iter()) for (auto &target: sr.rule->deps.iter()) {
-            ConstCharRange atgt = target.iter();
-            repd.clear();
-            auto lp = ostd::find(atgt, '%');
-            if (!lp.empty()) {
-                repd.append(slice_until(atgt, lp));
-                repd.append(sr.sub);
-                ++lp;
+        for (auto &sr: rlist.iter()) {
+            for (auto &target: sr.rule->deps.iter()) {
+                ConstCharRange atgt = target.iter();
+                repd.clear();
+                auto lp = ostd::find(atgt, '%');
                 if (!lp.empty()) {
-                    repd.append(lp);
+                    repd.append(slice_until(atgt, lp));
+                    repd.append(sr.sub);
+                    ++lp;
+                    if (!lp.empty()) {
+                        repd.append(lp);
+                    }
+                    atgt = repd.iter();
                 }
-                atgt = repd.iter();
-            }
-            subdeps.push(atgt);
-            int r = exec_rule(atgt, tname);
-            if (r) {
-                return r;
+                subdeps.push(atgt);
+                int r = exec_rule(atgt, tname);
+                if (r) {
+                    return r;
+                }
             }
         }
         return 0;

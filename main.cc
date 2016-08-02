@@ -36,12 +36,13 @@ using cscript::Bytecode;
 /* thread pool */
 
 struct ThreadPool {
-    ThreadPool() {}
+    ThreadPool():
+        cond(), mtx(), thrs(), tasks(nullptr), last_task(nullptr),
+        running(false)
+    {}
 
     ~ThreadPool() {
-        if (running) {
-            destroy();
-        }
+        destroy();
     }
 
     static void *thr_func(void *ptr) {
@@ -63,6 +64,10 @@ struct ThreadPool {
 
     void destroy() {
         mtx.lock();
+        if (!running) {
+            mtx.unlock();
+            return;
+        }
         running = false;
         mtx.unlock();
         cond.broadcast();
@@ -235,32 +240,35 @@ struct ObState: CsState {
     Map<ConstCharRange, Vector<SubRule>> cache;
 
     struct RuleCounter {
-        RuleCounter(): cond(), mtx(), counter(0), result(0) {}
+        RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}
 
         void wait() {
-            UniqueLock<Mutex> l(mtx);
-            while (counter) {
-                cond.wait(l);
+            UniqueLock<Mutex> l(p_mtx);
+            while (p_counter) {
+                p_cond.wait(l);
             }
         }
 
         void incr() {
-            UniqueLock<Mutex> l(mtx);
-            ++counter;
+            UniqueLock<Mutex> l(p_mtx);
+            ++p_counter;
         }
 
         void decr() {
-            UniqueLock<Mutex> l(mtx);
-            if (!--counter) {
+            UniqueLock<Mutex> l(p_mtx);
+            if (!--p_counter) {
                 l.unlock();
-                cond.broadcast();
+                p_cond.broadcast();
             }
         }
 
-        Condition cond;
-        Mutex mtx;
-        int volatile counter;
-        ostd::AtomicInt result;
+        ostd::AtomicInt &get_result() { return p_result; }
+
+private:
+        Condition p_cond;
+        Mutex p_mtx;
+        int p_counter;
+        ostd::AtomicInt p_result;
     };
 
     Vector<RuleCounter *> counters;
@@ -275,7 +283,7 @@ struct ObState: CsState {
             return ret;
         }
         ctr.wait();
-        return ctr.result;
+        return ctr.get_result();
     }
 
     template<typename ...A>
@@ -575,8 +583,8 @@ int main(int argc, char **argv) {
         cnt->incr();
         tpool.push([cnt, ds = String(args[0].get_strr())]() {
             int ret = system(ds.data());
-            if (ret && !cnt->result) {
-                cnt->result = ret;
+            if (ret && !cnt->get_result()) {
+                cnt->get_result() = ret;
             }
             cnt->decr();
         });

@@ -323,7 +323,7 @@ struct ObState: CsState {
 
         ostd::AtomicInt &get_result() { return p_result; }
 
-private:
+    private:
         Condition p_cond;
         Mutex p_mtx;
         int p_counter;
@@ -553,7 +553,7 @@ private:
         });
 
         add_command("depend", "ss", [this](cscript::TvalRange args) {
-            rule_add(args[0].get_strr(), args[1].get_str().iter(), nullptr);
+            rule_add(args[0].get_strr(), args[1].get_strr(), nullptr);
         });
 
         add_command("duprule", "sssN", [this](cscript::TvalRange args) {

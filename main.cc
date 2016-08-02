@@ -210,8 +210,6 @@ static ConstCharRange ob_compare_subst(
     return expanded;
 }
 
-static ThreadPool tpool;
-
 struct ObState: CsState {
     ConstCharRange progname;
     int jobs = 1;
@@ -574,11 +572,12 @@ int main(int argc, char **argv) {
         }
     }
 
+    ThreadPool tpool;
     tpool.init(os.jobs);
 
     os.register_rulecmds();
 
-    os.add_command("shell", "C", [&os](TvalRange args) {
+    os.add_command("shell", "C", [&os, &tpool](TvalRange args) {
         auto cnt = os.counters.back();
         cnt->incr();
         tpool.push([cnt, ds = String(args[0].get_strr())]() {

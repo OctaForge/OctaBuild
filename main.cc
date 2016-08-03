@@ -607,27 +607,27 @@ int main(int argc, char **argv) {
             }
             ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
             switch (argn) {
-            case 'C':
-                if (!ostd::directory_change(val)) {
-                    return os.error(1, "failed changing directory: %s", val);
+                case 'C':
+                    if (!ostd::directory_change(val)) {
+                        return os.error(1, "failed changing directory: %s", val);
+                    }
+                    break;
+                case 'f':
+                    deffile = val;
+                    break;
+                case 'e':
+                    fcont = val;
+                    break;
+                case 'j': {
+                    int ival = atoi(val.data());
+                    if (!ival) {
+                        ival = ncpus;
+                    }
+                    os.jobs = ostd::max(1, ival);
+                    break;
                 }
-                break;
-            case 'f':
-                deffile = val;
-                break;
-            case 'e':
-                fcont = val;
-                break;
-            case 'j': {
-                int ival = atoi(val.data());
-                if (!ival) {
-                    ival = ncpus;
-                }
-                os.jobs = ostd::max(1, ival);
-                break;
-            }
-            default:
-                return os.print_help(true, deffile);
+                default:
+                    return os.print_help(true, deffile);
             }
         } else {
             posarg = i;

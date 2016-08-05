@@ -681,7 +681,7 @@ int main(int argc, char **argv) {
             }
             auto dot = ostd::find_last(it, '.');
             if (!dot.empty() && ((dot + 1) == oldext)) {
-                ret += ostd::slice_until(it, dot);
+                ret += slice_until(it, dot);
                 ret += '.';
                 ret += newext;
             } else {

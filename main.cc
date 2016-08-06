@@ -20,7 +20,6 @@ using ostd::ConstCharRange;
 using ostd::Vector;
 using ostd::Map;
 using ostd::String;
-using ostd::Uint32;
 using ostd::slice_until;
 using ostd::UniqueLock;
 using ostd::Mutex;
@@ -30,6 +29,7 @@ using cscript::CsState;
 using cscript::TvalRange;
 using cscript::StackedValue;
 using cscript::BytecodeRef;
+using cscript::Bytecode;
 
 /* glob matching code */
 
@@ -506,7 +506,7 @@ struct ObState: CsState {
     }
 
     void rule_add(
-        ConstCharRange tgt, ConstCharRange dep, Uint32 *body,
+        ConstCharRange tgt, ConstCharRange dep, Bytecode *body,
         bool action = false
     ) {
         auto targets = cscript::util::list_explode(tgt);

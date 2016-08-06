@@ -29,7 +29,7 @@ using ostd::Condition;
 using cscript::CsState;
 using cscript::TvalRange;
 using cscript::StackedValue;
-using cscript::Bytecode;
+using cscript::BytecodeRef;
 
 /* glob matching code */
 
@@ -280,7 +280,7 @@ struct ObState: CsState {
     struct Rule {
         String target;
         Vector<String> deps;
-        Bytecode func;
+        BytecodeRef func;
         bool action;
 
         Rule(): target(), deps(), func(), action(false) {}
@@ -386,7 +386,7 @@ struct ObState: CsState {
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
-        Bytecode *func = nullptr;
+        BytecodeRef *func = nullptr;
         bool act = false;
         for (auto &sr: rlist.iter()) {
             if (sr.rule->func) {

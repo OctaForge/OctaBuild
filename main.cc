@@ -514,7 +514,7 @@ struct ObState: CsState {
             Rule &r = rules.push();
             r.target = target;
             r.action = action;
-            r.func = body;
+            r.func = cscript::code_is_empty(body) ? nullptr : body;
             r.deps = cscript::util::list_explode(dep);
         }
     }
@@ -541,10 +541,9 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        add_command("rule", "sseN", [this](cscript::TvalRange args) {
+        add_command("rule", "sse", [this](cscript::TvalRange args) {
             rule_add(
-                args[0].get_strr(), args[1].get_strr(),
-                (args[3].get_int() > 2) ? args[2].get_code() : nullptr
+                args[0].get_strr(), args[1].get_strr(), args[2].get_code()
             );
         });
 

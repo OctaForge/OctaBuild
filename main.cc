@@ -27,6 +27,7 @@ using ostd::Condition;
 
 using cscript::CsState;
 using cscript::TvalRange;
+using cscript::TaggedValue;
 using cscript::StackedValue;
 using cscript::BytecodeRef;
 using cscript::Bytecode;
@@ -541,21 +542,21 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        add_command("rule", "sse", [this](cscript::TvalRange args) {
+        add_command("rule", "sse", [this](TvalRange args, TaggedValue &) {
             rule_add(
                 args[0].get_strr(), args[1].get_strr(), args[2].get_code()
             );
         });
 
-        add_command("action", "se", [this](cscript::TvalRange args) {
+        add_command("action", "se", [this](TvalRange args, TaggedValue &) {
             rule_add(args[0].get_strr(), nullptr, args[1].get_code(), true);
         });
 
-        add_command("depend", "ss", [this](cscript::TvalRange args) {
+        add_command("depend", "ss", [this](TvalRange args, TaggedValue &) {
             rule_add(args[0].get_strr(), args[1].get_strr(), nullptr);
         });
 
-        add_command("duprule", "sssN", [this](cscript::TvalRange args) {
+        add_command("duprule", "sssN", [this](TvalRange args, TaggedValue &) {
             rule_dup(
                 args[0].get_strr(), args[1].get_strr(),
                 args[2].get_strr(), args[3].get_int() <= 2
@@ -639,7 +640,9 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
-    os.add_command("shell", "C", [&os, &tpool](TvalRange args) {
+    os.add_command("shell", "C", [&os, &tpool](
+        TvalRange args, TaggedValue &res
+    ) {
         auto cnt = os.counters.back();
         cnt->incr();
         tpool.push([cnt, ds = String(args[0].get_strr())]() {
@@ -649,20 +652,20 @@ int main(int argc, char **argv) {
             }
             cnt->decr();
         });
-        os.result->set_int(0);
+        res.set_int(0);
     });
 
-    os.add_command("getenv", "ss", [&os](TvalRange args) {
+    os.add_command("getenv", "ss", [&os](TvalRange args, TaggedValue &res) {
         if (os.ignore_env) {
-            os.result->set_cstr("");
+            res.set_cstr("");
             return;
         }
-        os.result->set_str(ostd::move(
+        res.set_str(ostd::move(
             ostd::env_get(args[0].get_str()).value_or(args[1].get_str())
         ));
     });
 
-    os.add_command("extreplace", "sss", [&os](TvalRange args) {
+    os.add_command("extreplace", "sss", [&os](TvalRange args, TaggedValue &res) {
         ConstCharRange lst = args[0].get_strr();
         ConstCharRange oldext = args[1].get_strr();
         ConstCharRange newext = args[2].get_strr();
@@ -687,16 +690,16 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        os.result->set_str(ostd::move(ret));
+        res.set_str(ostd::move(ret));
     });
 
-    os.add_command("invoke", "s", [&os](TvalRange args) {
-        os.result->set_int(os.exec_main(args[0].get_strr()));
+    os.add_command("invoke", "s", [&os](TvalRange args, TaggedValue &res) {
+        res.set_int(os.exec_main(args[0].get_strr()));
     });
 
-    os.add_command("glob", "C", [&os](TvalRange args) {
+    os.add_command("glob", "C", [&os](TvalRange args, TaggedValue &res) {
         auto fnames = cscript::util::list_explode(args[0].get_strr());
-        os.result->set_str(ob_expand_globs(fnames).disown());
+        res.set_str(ob_expand_globs(fnames).disown());
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {

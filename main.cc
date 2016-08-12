@@ -397,20 +397,19 @@ struct ObState: CsState {
             }
         }
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
-            StackedValue targetv, sourcev, sourcesv;
-            CsState &cs = *this;
+            StackedValue targetv(*this), sourcev(*this), sourcesv(*this);
 
-            if (!targetv.alias(cs, "target")) {
+            if (!targetv.set_id("target")) {
                 return 1;
             }
             targetv.set_cstr(tname);
             targetv.push();
 
             if (!subdeps.empty()) {
-                if (!sourcev.alias(cs, "source")) {
+                if (!sourcev.set_id("source")) {
                     return 1;
                 }
-                if (!sourcesv.alias(cs, "sources")) {
+                if (!sourcesv.set_id("sources")) {
                     return 1;
                 }
 

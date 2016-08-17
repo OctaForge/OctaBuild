@@ -588,8 +588,8 @@ int main(int argc, char **argv) {
     cscript::init_libs(os);
 
     int ncpus = ostd::Thread::hardware_concurrency();
-    os.add_ident("numcpus", 4096, 1, &ncpus);
-    os.add_ident("numjobs", 4096, 1, &os.jobs);
+    os.add_ident(new cscript::Ident("numcpus", 4096, 1, &ncpus));
+    os.add_ident(new cscript::Ident("numjobs", 4096, 1, &os.jobs));
 
     ConstCharRange fcont;
     ConstCharRange deffile = "obuild.cfg";
@@ -698,7 +698,7 @@ int main(int argc, char **argv) {
 
     os.add_command("glob", "C", [&os](TvalRange args, TaggedValue &res) {
         auto fnames = cscript::util::list_explode(args[0].get_strr());
-        res.set_str(ob_expand_globs(fnames).disown());
+        res.set_str(ostd::move(ob_expand_globs(fnames)));
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {

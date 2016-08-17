@@ -588,8 +588,8 @@ int main(int argc, char **argv) {
     cscript::init_libs(os);
 
     int ncpus = ostd::Thread::hardware_concurrency();
-    os.add_ident(new cscript::Ident("numcpus", 4096, 1, &ncpus));
-    os.add_ident(new cscript::Ident("numjobs", 4096, 1, &os.jobs));
+    os.add_ident(new cscript::Ivar("numcpus", 4096, 1, &ncpus));
+    os.add_ident(new cscript::Ivar("numjobs", 4096, 1, &os.jobs));
 
     ConstCharRange fcont;
     ConstCharRange deffile = "obuild.cfg";

@@ -585,7 +585,7 @@ int main(int argc, char **argv) {
     ConstCharRange lslash = ostd::find_last(pn, '/');
     os.progname = lslash.empty() ? pn : (lslash + 1);
 
-    cscript::init_libs(os);
+    os.init_libs();
 
     int ncpus = ostd::Thread::hardware_concurrency();
     os.add_ident(new cscript::Ivar("numcpus", 4096, 1, &ncpus));

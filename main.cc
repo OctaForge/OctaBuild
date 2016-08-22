@@ -274,7 +274,6 @@ static ConstCharRange ob_compare_subst(
 
 struct ObState: CsState {
     ConstCharRange progname;
-    int jobs = 1;
     bool ignore_env = false;
 
     /* represents a rule definition, possibly with a function */
@@ -587,9 +586,9 @@ int main(int argc, char **argv) {
 
     os.init_libs();
 
+    int jobs = 1;
     int ncpus = ostd::Thread::hardware_concurrency();
-    os.add_ident<cscript::Ivar>("numcpus", 4096, 1, &ncpus);
-    os.add_ident<cscript::Ivar>("numjobs", 4096, 1, &os.jobs);
+    os.add_ident<cscript::Ivar>("numcpus", 4096, 1, ncpus);
 
     ConstCharRange fcont;
     ConstCharRange deffile = "obuild.cfg";
@@ -622,7 +621,7 @@ int main(int argc, char **argv) {
                     if (!ival) {
                         ival = ncpus;
                     }
-                    os.jobs = ostd::max(1, ival);
+                    jobs = ostd::max(1, ival);
                     break;
                 }
                 default:
@@ -634,8 +633,10 @@ int main(int argc, char **argv) {
         }
     }
 
+    os.add_ident<cscript::Ivar>("numjobs", 4096, 1, jobs);
+
     ThreadPool tpool;
-    tpool.init(os.jobs);
+    tpool.init(jobs);
 
     os.register_rulecmds();
 

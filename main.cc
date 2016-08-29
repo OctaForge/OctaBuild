@@ -513,7 +513,7 @@ struct ObState: CsState {
             Rule &r = rules.push();
             r.target = target;
             r.action = action;
-            r.func = cscript::code_is_empty(body) ? nullptr : body;
+            r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
             r.deps = cscript::util::list_explode(dep);
         }
     }
@@ -588,7 +588,7 @@ int main(int argc, char **argv) {
 
     int jobs = 1;
     int ncpus = ostd::Thread::hardware_concurrency();
-    os.add_ident<cscript::Ivar>("numcpus", 4096, 1, ncpus);
+    os.add_ident<cscript::CsIvar>("numcpus", 4096, 1, ncpus);
 
     ConstCharRange fcont;
     ConstCharRange deffile = "obuild.cfg";
@@ -633,7 +633,7 @@ int main(int argc, char **argv) {
         }
     }
 
-    os.add_ident<cscript::Ivar>("numjobs", 4096, 1, jobs);
+    os.add_ident<cscript::CsIvar>("numjobs", 4096, 1, jobs);
 
     ThreadPool tpool;
     tpool.init(jobs);

@@ -28,7 +28,7 @@ using ostd::Condition;
 using cscript::CsState;
 using cscript::CsValueRange;
 using cscript::CsValue;
-using cscript::StackedValue;
+using cscript::CsStackedValue;
 using cscript::CsBytecodeRef;
 using cscript::CsBytecode;
 
@@ -396,7 +396,7 @@ struct ObState: CsState {
             }
         }
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
-            StackedValue targetv, sourcev, sourcesv;
+            CsStackedValue targetv, sourcev, sourcesv;
 
             if (!targetv.set_alias(new_ident("target"))) {
                 return 1;

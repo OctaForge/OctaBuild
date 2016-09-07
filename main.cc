@@ -640,6 +640,10 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
+    os.new_command("echo", "C", [&os](CsValueRange args, CsValue &) {
+        os.get_out().writeln(args[0].get_strr());
+    });
+
     os.new_command("shell", "C", [&os, &tpool](
         CsValueRange args, CsValue &res
     ) {

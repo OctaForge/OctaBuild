@@ -12,7 +12,7 @@
 #include <ostd/mutex.hh>
 #include <ostd/condition.hh>
 
-#include <cubescript.hh>
+#include <cubescript/cubescript.hh>
 
 #include "tpool.hh"
 

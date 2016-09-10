@@ -5,7 +5,7 @@ OCTASTD_PATH = ../octastd
 
 FILES = main.o
 
-OB_CXXFLAGS += -std=c++14 -I. -I$(CUBESCRIPT_PATH) -I$(OCTASTD_PATH) -pthread
+OB_CXXFLAGS += -std=c++14 -I. -I$(CUBESCRIPT_PATH)/include -I$(OCTASTD_PATH) -pthread
 
 all: obuild
 
@@ -19,4 +19,4 @@ obuild: $(FILES)
 clean:
 	rm -f $(FILES) obuild
 
-main.o: tpool.hh $(CUBESCRIPT_PATH)/cubescript.hh
+main.o: tpool.hh $(CUBESCRIPT_PATH)/include/cubescript/cubescript.hh

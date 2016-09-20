@@ -648,8 +648,8 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
-    os.new_command("echo", "C", [](CsState &cs, CsValueRange args, CsValue &) {
-        cs.get_out().writeln(args[0].get_strr());
+    os.new_command("echo", "C", [](CsState &, CsValueRange args, CsValue &) {
+        writeln(args[0].get_strr());
     });
 
     os.new_command("shell", "C", [&os, &tpool](

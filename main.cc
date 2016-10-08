@@ -508,13 +508,13 @@ struct ObState: CsState {
         ConstCharRange tgt, ConstCharRange dep, CsBytecode *body,
         bool action = false
     ) {
-        auto targets = cscript::util::list_explode(tgt);
+        auto targets = cscript::util::list_explode(*this, tgt);
         for (auto &target: targets.iter()) {
             Rule &r = rules.push();
             r.target = target;
             r.action = action;
             r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
-            r.deps = cscript::util::list_explode(dep);
+            r.deps = cscript::util::list_explode(*this, dep);
         }
     }
 
@@ -536,7 +536,11 @@ struct ObState: CsState {
         r.target = tgt;
         r.action = oldr->action;
         r.func = oldr->func;
-        r.deps = inherit_deps ? oldr->deps : cscript::util::list_explode(dep);
+        if (inherit_deps) {
+            r.deps = oldr->deps;
+        } else {
+            r.deps = cscript::util::list_explode(*this, dep);
+        }
     }
 
     void register_rulecmds() {
@@ -680,7 +684,7 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("extreplace", "sss", [](
-        CsState &, CsValueRange args, CsValue &res
+        CsState &cs, CsValueRange args, CsValue &res
     ) {
         ConstCharRange lst = args[0].get_strr();
         ConstCharRange oldext = args[1].get_strr();
@@ -692,7 +696,7 @@ int main(int argc, char **argv) {
         if (newext.front() == '.') {
             newext.pop_front();
         }
-        auto fnames = cscript::util::list_explode(lst);
+        auto fnames = cscript::util::list_explode(cs, lst);
         for (ConstCharRange it: fnames.iter()) {
             if (!ret.empty()) {
                 ret += ' ';
@@ -716,9 +720,9 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("glob", "C", [&os](
-        CsState &, CsValueRange args, CsValue &res
+        CsState &cs, CsValueRange args, CsValue &res
     ) {
-        auto fnames = cscript::util::list_explode(args[0].get_strr());
+        auto fnames = cscript::util::list_explode(cs, args[0].get_strr());
         res.set_str(ostd::move(ob_expand_globs(fnames)));
     });
 

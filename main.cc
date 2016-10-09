@@ -505,22 +505,22 @@ struct ObState: CsState {
     }
 
     void rule_add(
-        ConstCharRange tgt, ConstCharRange dep, CsBytecode *body,
+        CsState &cs, ConstCharRange tgt, ConstCharRange dep, CsBytecode *body,
         bool action = false
     ) {
-        auto targets = cscript::util::list_explode(*this, tgt);
+        auto targets = cscript::util::list_explode(cs, tgt);
         for (auto &target: targets.iter()) {
             Rule &r = rules.push();
             r.target = target;
             r.action = action;
             r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
-            r.deps = cscript::util::list_explode(*this, dep);
+            r.deps = cscript::util::list_explode(cs, dep);
         }
     }
 
     void rule_dup(
-        ConstCharRange tgt, ConstCharRange ptgt, ConstCharRange dep,
-        bool inherit_deps
+        CsState &cs, ConstCharRange tgt, ConstCharRange ptgt,
+        ConstCharRange dep, bool inherit_deps
     ) {
         Rule *oldr = nullptr;
         for (auto &rule: rules.iter()) {
@@ -539,36 +539,36 @@ struct ObState: CsState {
         if (inherit_deps) {
             r.deps = oldr->deps;
         } else {
-            r.deps = cscript::util::list_explode(*this, dep);
+            r.deps = cscript::util::list_explode(cs, dep);
         }
     }
 
     void register_rulecmds() {
         new_command("rule", "sse", [this](
-            CsState &, CsValueRange args, CsValue &
+            CsState &cs, CsValueRange args, CsValue &
         ) {
             rule_add(
-                args[0].get_strr(), args[1].get_strr(), args[2].get_code()
+                cs, args[0].get_strr(), args[1].get_strr(), args[2].get_code()
             );
         });
 
         new_command("action", "se", [this](
-            CsState &, CsValueRange args, CsValue &
+            CsState &cs, CsValueRange args, CsValue &
         ) {
-            rule_add(args[0].get_strr(), nullptr, args[1].get_code(), true);
+            rule_add(cs, args[0].get_strr(), nullptr, args[1].get_code(), true);
         });
 
         new_command("depend", "ss", [this](
-            CsState &, CsValueRange args, CsValue &
+            CsState &cs, CsValueRange args, CsValue &
         ) {
-            rule_add(args[0].get_strr(), args[1].get_strr(), nullptr);
+            rule_add(cs, args[0].get_strr(), args[1].get_strr(), nullptr);
         });
 
         new_command("duprule", "sssN", [this](
-            CsState &, CsValueRange args, CsValue &
+            CsState &cs, CsValueRange args, CsValue &
         ) {
             rule_dup(
-                args[0].get_strr(), args[1].get_strr(),
+                cs, args[0].get_strr(), args[1].get_strr(),
                 args[2].get_strr(), args[3].get_int() <= 2
             );
         });

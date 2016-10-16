@@ -544,29 +544,21 @@ struct ObState: CsState {
     }
 
     void register_rulecmds() {
-        new_command("rule", "sse", [this](
-            CsState &cs, CsValueRange args, CsValue &
-        ) {
+        new_command("rule", "sse", [this](auto &cs, auto args, auto &) {
             rule_add(
                 cs, args[0].get_strr(), args[1].get_strr(), args[2].get_code()
             );
         });
 
-        new_command("action", "se", [this](
-            CsState &cs, CsValueRange args, CsValue &
-        ) {
+        new_command("action", "se", [this](auto &cs, auto args, auto &) {
             rule_add(cs, args[0].get_strr(), nullptr, args[1].get_code(), true);
         });
 
-        new_command("depend", "ss", [this](
-            CsState &cs, CsValueRange args, CsValue &
-        ) {
+        new_command("depend", "ss", [this](auto &cs, auto args, auto &) {
             rule_add(cs, args[0].get_strr(), args[1].get_strr(), nullptr);
         });
 
-        new_command("duprule", "sssN", [this](
-            CsState &cs, CsValueRange args, CsValue &
-        ) {
+        new_command("duprule", "sssN", [this](auto &cs, auto args, auto &) {
             rule_dup(
                 cs, args[0].get_strr(), args[1].get_strr(),
                 args[2].get_strr(), args[3].get_int() <= 2
@@ -652,13 +644,11 @@ int main(int argc, char **argv) {
 
     os.register_rulecmds();
 
-    os.new_command("echo", "C", [](CsState &, CsValueRange args, CsValue &) {
+    os.new_command("echo", "C", [](auto &, auto args, auto &) {
         writeln(args[0].get_strr());
     });
 
-    os.new_command("shell", "C", [&os, &tpool](
-        CsState &, CsValueRange args, CsValue &res
-    ) {
+    os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &res) {
         auto cnt = os.counters.back();
         cnt->incr();
         tpool.push([cnt, ds = String(args[0].get_strr())]() {
@@ -671,9 +661,7 @@ int main(int argc, char **argv) {
         res.set_int(0);
     });
 
-    os.new_command("getenv", "ss", [&os](
-        CsState &, CsValueRange args, CsValue &res
-    ) {
+    os.new_command("getenv", "ss", [&os](auto &, auto args, auto &res) {
         if (os.ignore_env) {
             res.set_cstr("");
             return;
@@ -683,9 +671,7 @@ int main(int argc, char **argv) {
         ));
     });
 
-    os.new_command("extreplace", "sss", [](
-        CsState &cs, CsValueRange args, CsValue &res
-    ) {
+    os.new_command("extreplace", "sss", [](auto &cs, auto args, auto &res) {
         ConstCharRange lst = args[0].get_strr();
         ConstCharRange oldext = args[1].get_strr();
         ConstCharRange newext = args[2].get_strr();
@@ -713,15 +699,11 @@ int main(int argc, char **argv) {
         res.set_str(ostd::move(ret));
     });
 
-    os.new_command("invoke", "s", [&os](
-        CsState &, CsValueRange args, CsValue &res
-    ) {
+    os.new_command("invoke", "s", [&os](auto &, auto args, auto &res) {
         res.set_int(os.exec_main(args[0].get_strr()));
     });
 
-    os.new_command("glob", "C", [&os](
-        CsState &cs, CsValueRange args, CsValue &res
-    ) {
+    os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
         auto fnames = cscript::util::list_explode(cs, args[0].get_strr());
         res.set_str(ostd::move(ob_expand_globs(fnames)));
     });

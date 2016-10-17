@@ -590,14 +590,13 @@ int main(int argc, char **argv) {
 
     os.init_libs();
 
-    int jobs = 1;
     int ncpus = ostd::Thread::hardware_concurrency();
     os.new_ivar("numcpus", 4096, 1, ncpus);
 
     ConstCharRange fcont;
     ConstCharRange deffile = "obuild.cfg";
 
-    int posarg = argc;
+    int jobs = 1, posarg = argc;
     for (int i = 1; i < argc; ++i) {
         if (argv[i][0] == '-') {
             char argn = argv[i][1];
@@ -636,7 +635,6 @@ int main(int argc, char **argv) {
             break;
         }
     }
-
     os.new_ivar("numjobs", 4096, 1, jobs);
 
     ThreadPool tpool;

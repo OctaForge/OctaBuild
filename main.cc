@@ -186,14 +186,6 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
     return true;
 }
 
-static String ob_expand_globs(Vector<String> const &src) {
-    String ret;
-    for (auto &s: src.iter()) {
-        ob_expand_glob(ret, s.iter());
-    }
-    return ret;
-}
-
 /* check funcs */
 
 static bool ob_check_ts(ConstCharRange tname, Vector<String> const &deps) {
@@ -508,13 +500,16 @@ struct ObState: CsState {
         CsState &cs, ConstCharRange tgt, ConstCharRange dep, CsBytecode *body,
         bool action = false
     ) {
-        auto targets = cscript::util::list_explode(cs, tgt);
-        for (auto &target: targets.iter()) {
+        cscript::util::ListParser p{cs, tgt};
+        while (p.parse()) {
             Rule &r = rules.push();
-            r.target = target;
+            r.target = p.element();
             r.action = action;
             r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
-            r.deps = cscript::util::list_explode(cs, dep);
+            cscript::util::ListParser lp{cs, dep};
+            while (lp.parse()) {
+                r.deps.push(lp.element());
+            }
         }
     }
 
@@ -539,7 +534,10 @@ struct ObState: CsState {
         if (inherit_deps) {
             r.deps = oldr->deps;
         } else {
-            r.deps = cscript::util::list_explode(cs, dep);
+            cscript::util::ListParser p{cs, dep};
+            while (p.parse()) {
+                r.deps.push(p.element());
+            }
         }
     }
 
@@ -680,8 +678,10 @@ int main(int argc, char **argv) {
         if (newext.front() == '.') {
             newext.pop_front();
         }
-        auto fnames = cscript::util::list_explode(cs, lst);
-        for (ConstCharRange it: fnames.iter()) {
+        cscript::util::ListParser p{cs, lst};
+        while (p.parse()) {
+            auto elem = p.element();
+            ConstCharRange it = elem.iter();
             if (!ret.empty()) {
                 ret += ' ';
             }
@@ -702,8 +702,12 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
-        auto fnames = cscript::util::list_explode(cs, args[0].get_strr());
-        res.set_str(ostd::move(ob_expand_globs(fnames)));
+        String ret;
+        cscript::util::ListParser p{cs, args[0].get_strr()};
+        while (p.parse()) {
+            ob_expand_glob(ret, p.element());
+        }
+        res.set_str(ostd::move(ret));
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {

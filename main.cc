@@ -503,12 +503,12 @@ struct ObState: CsState {
         cscript::util::ListParser p{cs, tgt};
         while (p.parse()) {
             Rule &r = rules.push();
-            r.target = p.element();
+            r.target = p.get_item();
             r.action = action;
             r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
             cscript::util::ListParser lp{cs, dep};
             while (lp.parse()) {
-                r.deps.push(lp.element());
+                r.deps.push(lp.get_item());
             }
         }
     }
@@ -536,36 +536,38 @@ struct ObState: CsState {
         } else {
             cscript::util::ListParser p{cs, dep};
             while (p.parse()) {
-                r.deps.push(p.element());
+                r.deps.push(p.get_item());
             }
         }
     }
 
     void register_rulecmds() {
         new_command("rule", "sse", [this](auto &cs, auto args, auto &) {
-            rule_add(
+            this->rule_add(
                 cs, args[0].get_strr(), args[1].get_strr(), args[2].get_code()
             );
         });
 
         new_command("action", "se", [this](auto &cs, auto args, auto &) {
-            rule_add(cs, args[0].get_strr(), nullptr, args[1].get_code(), true);
+            this->rule_add(
+                cs, args[0].get_strr(), nullptr, args[1].get_code(), true
+            );
         });
 
         new_command("depend", "ss", [this](auto &cs, auto args, auto &) {
-            rule_add(cs, args[0].get_strr(), args[1].get_strr(), nullptr);
+            this->rule_add(cs, args[0].get_strr(), args[1].get_strr(), nullptr);
         });
 
         new_command("duprule", "sssN", [this](auto &cs, auto args, auto &) {
-            rule_dup(
+            this->rule_dup(
                 cs, args[0].get_strr(), args[1].get_strr(),
                 args[2].get_strr(), args[3].get_int() <= 2
             );
         });
     }
 
-    int print_help(bool error, ConstCharRange deffile) {
-        ostd::Stream &os = error ? ostd::err : ostd::out;
+    int print_help(bool is_error, ConstCharRange deffile) {
+        ostd::Stream &os = is_error ? ostd::err : ostd::out;
         os.writeln(
             "Usage: ", progname,  " [options] [action]\n",
             "Options:\n"
@@ -576,7 +578,7 @@ struct ObState: CsState {
             "  -e STR\tEvaluate a string instead of a file.\n"
             "  -E\t\tIgnore environment variables."
         );
-        return error;
+        return is_error;
     }
 };
 
@@ -680,7 +682,7 @@ int main(int argc, char **argv) {
         }
         cscript::util::ListParser p{cs, lst};
         while (p.parse()) {
-            auto elem = p.element();
+            auto elem = p.get_item();
             ConstCharRange it = elem.iter();
             if (!ret.empty()) {
                 ret += ' ';
@@ -705,7 +707,7 @@ int main(int argc, char **argv) {
         String ret;
         cscript::util::ListParser p{cs, args[0].get_strr()};
         while (p.parse()) {
-            ob_expand_glob(ret, p.element());
+            ob_expand_glob(ret, p.get_item());
         }
         res.set_str(ostd::move(ret));
     });

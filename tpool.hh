@@ -1,37 +1,36 @@
 #ifndef OBUILD_TPOOL_HH
 #define OBUILD_TPOOL_HH
 
-#include <ostd/thread.hh>
+#include <utility>
+#include <vector>
+#include <functional>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
-using ostd::Thread;
-using ostd::UniqueLock;
-using ostd::Mutex;
-using ostd::Condition;
-using ostd::Vector;
-
-struct ThreadPool {
-    ThreadPool():
+struct thread_pool {
+    thread_pool():
         cond(), mtx(), thrs(), tasks(nullptr), last_task(nullptr),
         running(false)
     {}
 
-    ~ThreadPool() {
+    ~thread_pool() {
         destroy();
     }
 
     static void *thr_func(void *ptr) {
-        static_cast<ThreadPool *>(ptr)->run();
+        static_cast<thread_pool *>(ptr)->run();
         return nullptr;
     }
 
-    bool init(ostd::Size size) {
+    bool init(size_t size) {
         running = true;
-        for (ostd::Size i = 0; i < size; ++i) {
-            Thread tid([this]() { run(); });
-            if (!tid) {
+        for (size_t i = 0; i < size; ++i) {
+            std::thread tid{[this]() { run(); }};
+            if (!tid.joinable()) {
                 return false;
             }
-            thrs.push(ostd::move(tid));
+            thrs.push_back(std::move(tid));
         }
         return true;
     }
@@ -44,24 +43,23 @@ struct ThreadPool {
         }
         running = false;
         mtx.unlock();
-        cond.broadcast();
-        for (Thread &tid: thrs.iter()) {
+        cond.notify_all();
+        for (std::thread &tid: thrs) {
             tid.join();
-            cond.broadcast();
+            cond.notify_all();
         }
     }
 
     void run() {
         for (;;) {
-            UniqueLock<Mutex> l(mtx);
+            std::unique_lock<std::mutex> l(mtx);
             while (running && (tasks == nullptr)) {
                 cond.wait(l);
             }
             if (!running) {
-                l.unlock();
-                ostd::this_thread::exit();
+                return;
             }
-            Task *t = tasks;
+            task *t = tasks;
             tasks = t->next;
             if (last_task == t) {
                 last_task = nullptr;
@@ -72,9 +70,9 @@ struct ThreadPool {
         }
     }
 
-    void push(ostd::Function<void()> func) {
+    void push(std::function<void()> func) {
         mtx.lock();
-        Task *t = new Task(ostd::move(func));
+        task *t = new task(std::move(func));
         if (last_task) {
             last_task->next = t;
         }
@@ -82,27 +80,27 @@ struct ThreadPool {
         if (!tasks) {
             tasks = t;
         }
-        cond.signal();
+        cond.notify_one();
         mtx.unlock();
     }
 
 private:
-    struct Task {
-        ostd::Function<void()> cb;
-        Task *next = nullptr;
-        Task() = delete;
-        Task(Task const &) = delete;
-        Task(Task &&) = delete;
-        Task(ostd::Function<void()> &&cbf): cb(ostd::move(cbf)) {}
-        Task &operator=(Task const &) = delete;
-        Task &operator=(Task &&) = delete;
+    struct task {
+        std::function<void()> cb;
+        task *next = nullptr;
+        task() = delete;
+        task(task const &) = delete;
+        task(task &&) = delete;
+        task(std::function<void()> &&cbf): cb(ostd::move(cbf)) {}
+        task &operator=(task const &) = delete;
+        task &operator=(task &&) = delete;
     };
 
-    Condition cond;
-    Mutex mtx;
-    Vector<Thread> thrs;
-    Task *tasks;
-    Task *last_task;
+    std::condition_variable cond;
+    std::mutex mtx;
+    std::vector<std::thread> thrs;
+    task *tasks;
+    task *last_task;
     bool volatile running;
 };
 

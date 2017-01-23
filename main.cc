@@ -1,16 +1,19 @@
+#include <utility>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+
 #include <ostd/types.hh>
+#include <ostd/vector.hh>
 #include <ostd/functional.hh>
 #include <ostd/string.hh>
-#include <ostd/vector.hh>
 #include <ostd/map.hh>
-#include <ostd/atomic.hh>
 #include <ostd/filesystem.hh>
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
 #include <ostd/utility.hh>
 #include <ostd/environ.hh>
-#include <ostd/mutex.hh>
-#include <ostd/condition.hh>
 
 #include <cubescript/cubescript.hh>
 
@@ -21,9 +24,6 @@ using ostd::Vector;
 using ostd::Map;
 using ostd::String;
 using ostd::slice_until;
-using ostd::UniqueLock;
-using ostd::Mutex;
-using ostd::Condition;
 
 using cscript::CsState;
 using cscript::CsValueRange;
@@ -294,32 +294,32 @@ struct ObState: CsState {
         RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}
 
         void wait() {
-            UniqueLock<Mutex> l(p_mtx);
+            std::unique_lock<std::mutex> l(p_mtx);
             while (p_counter) {
                 p_cond.wait(l);
             }
         }
 
         void incr() {
-            UniqueLock<Mutex> l(p_mtx);
+            std::unique_lock<std::mutex> l(p_mtx);
             ++p_counter;
         }
 
         void decr() {
-            UniqueLock<Mutex> l(p_mtx);
+            std::unique_lock<std::mutex> l(p_mtx);
             if (!--p_counter) {
                 l.unlock();
-                p_cond.broadcast();
+                p_cond.notify_all();
             }
         }
 
-        ostd::AtomicInt &get_result() { return p_result; }
+        std::atomic_int &get_result() { return p_result; }
 
     private:
-        Condition p_cond;
-        Mutex p_mtx;
+        std::condition_variable p_cond;
+        std::mutex p_mtx;
         int p_counter;
-        ostd::AtomicInt p_result;
+        std::atomic_int p_result;
     };
 
     Vector<RuleCounter *> counters;
@@ -409,7 +409,7 @@ struct ObState: CsState {
 
                 auto dsv = ostd::appender<String>();
                 ostd::concat(dsv, subdeps);
-                sourcesv.set_str(ostd::move(dsv.get()));
+                sourcesv.set_str(std::move(dsv.get()));
                 sourcesv.push();
             }
 
@@ -590,7 +590,7 @@ int main(int argc, char **argv) {
 
     os.init_libs();
 
-    int ncpus = ostd::Thread::hardware_concurrency();
+    int ncpus = std::thread::hardware_concurrency();
     os.new_ivar("numcpus", 4096, 1, ncpus);
 
     ConstCharRange fcont;
@@ -637,7 +637,7 @@ int main(int argc, char **argv) {
     }
     os.new_ivar("numjobs", 4096, 1, jobs);
 
-    ThreadPool tpool;
+    thread_pool tpool;
     tpool.init(jobs);
 
     os.register_rulecmds();
@@ -664,7 +664,7 @@ int main(int argc, char **argv) {
             res.set_cstr("");
             return;
         }
-        res.set_str(ostd::move(
+        res.set_str(std::move(
             ostd::env_get(args[0].get_str()).value_or(args[1].get_str())
         ));
     });
@@ -696,7 +696,7 @@ int main(int argc, char **argv) {
                 ret += it;
             }
         }
-        res.set_str(ostd::move(ret));
+        res.set_str(std::move(ret));
     });
 
     os.new_command("invoke", "s", [&os](auto &, auto args, auto &res) {
@@ -709,7 +709,7 @@ int main(int argc, char **argv) {
         while (p.parse()) {
             ob_expand_glob(ret, p.get_item());
         }
-        res.set_str(ostd::move(ret));
+        res.set_str(std::move(ret));
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {

@@ -91,7 +91,7 @@ private:
         task() = delete;
         task(task const &) = delete;
         task(task &&) = delete;
-        task(std::function<void()> &&cbf): cb(ostd::move(cbf)) {}
+        task(std::function<void()> &&cbf): cb(std::move(cbf)) {}
         task &operator=(task const &) = delete;
         task &operator=(task &&) = delete;
     };

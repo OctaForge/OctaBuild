@@ -20,7 +20,6 @@
 #include "tpool.hh"
 
 using ostd::ConstCharRange;
-using ostd::Vector;
 using ostd::Map;
 using ostd::String;
 using ostd::slice_until;
@@ -35,28 +34,28 @@ using cscript::CsBytecode;
 /* glob matching code */
 
 static void ob_get_path_parts(
-    Vector<ConstCharRange> &parts, ConstCharRange elem
+    std::vector<ConstCharRange> &parts, ConstCharRange elem
 ) {
     ConstCharRange star = ostd::find(elem, '*');
     while (!star.empty()) {
         ConstCharRange ep = slice_until(elem, star);
         if (!ep.empty()) {
-            parts.push(ep);
+            parts.push_back(ep);
         }
-        parts.push("*");
+        parts.push_back("*");
         elem = star;
         ++elem;
         star = ostd::find(elem, '*');
     }
     if (!elem.empty()) {
-        parts.push(elem);
+        parts.push_back(elem);
     }
 }
 
 static bool ob_path_matches(
-    ConstCharRange fn, Vector<ConstCharRange> const &parts
+    ConstCharRange fn, std::vector<ConstCharRange> const &parts
 ) {
-    for (auto it = parts.iter(); !it.empty(); ++it) {
+    for (auto it = ostd::iter(parts); !it.empty(); ++it) {
         ConstCharRange elem = it.front();
         if (elem == "*") {
             ++it;
@@ -92,7 +91,7 @@ static bool ob_path_matches(
 static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne = false);
 
 static bool ob_expand_dir(
-    String &ret, ConstCharRange dir, Vector<ConstCharRange> const &parts,
+    String &ret, ConstCharRange dir, std::vector<ConstCharRange> const &parts,
     ConstCharRange slash
 ) {
     ostd::DirectoryStream d(dir);
@@ -170,7 +169,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
         fnpost = slice_until(fnpost, nslash);
     }
     /* retrieve the single element with whatever stars in it, chop it up */
-    Vector<ConstCharRange> parts;
+    std::vector<ConstCharRange> parts;
     ob_get_path_parts(parts, ConstCharRange(&fnpre[0], &fnpost[fnpost.size()]));
     /* do a directory scan and match */
     if (!ob_expand_dir(ret, dir, parts, nslash)) {
@@ -188,7 +187,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
 
 /* check funcs */
 
-static bool ob_check_ts(ConstCharRange tname, Vector<String> const &deps) {
+static bool ob_check_ts(ConstCharRange tname, std::vector<String> const &deps) {
     auto get_ts = [](ConstCharRange fname) {
         ostd::FileInfo fi(fname);
         if (fi.type() != ostd::FileType::regular) {
@@ -200,7 +199,7 @@ static bool ob_check_ts(ConstCharRange tname, Vector<String> const &deps) {
     if (!tts) {
         return true;
     }
-    for (auto &dep: deps.iter()) {
+    for (auto &dep: deps) {
         time_t sts = get_ts(dep);
         if (sts && (tts < sts)) {
             return true;
@@ -213,11 +212,13 @@ static bool ob_check_file(ConstCharRange fname) {
     return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
-static bool ob_check_exec(ConstCharRange tname, Vector<String> const &deps) {
+static bool ob_check_exec(
+    ConstCharRange tname, std::vector<String> const &deps
+) {
     if (!ob_check_file(tname)) {
         return true;
     }
-    for (auto &dep: deps.iter()) {
+    for (auto &dep: deps) {
         if (!ob_check_file(dep)) {
             return true;
         }
@@ -271,7 +272,7 @@ struct ObState: CsState {
     /* represents a rule definition, possibly with a function */
     struct Rule {
         String target;
-        Vector<String> deps;
+        std::vector<String> deps;
         CsBytecodeRef func;
         bool action;
 
@@ -281,14 +282,14 @@ struct ObState: CsState {
         {}
     };
 
-    Vector<Rule> rules;
+    std::vector<Rule> rules;
 
     struct SubRule {
         ConstCharRange sub;
         Rule *rule;
     };
 
-    Map<ConstCharRange, Vector<SubRule>> cache;
+    Map<ConstCharRange, std::vector<SubRule>> cache;
 
     struct RuleCounter {
         RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}
@@ -322,14 +323,14 @@ struct ObState: CsState {
         std::atomic_int p_result;
     };
 
-    Vector<RuleCounter *> counters;
+    std::vector<RuleCounter *> counters;
 
     template<typename F>
     int wait_result(F func) {
         RuleCounter ctr;
-        counters.push(&ctr);
+        counters.push_back(&ctr);
         int ret = func();
-        counters.pop();
+        counters.pop_back();
         if (ret) {
             return ret;
         }
@@ -340,17 +341,17 @@ struct ObState: CsState {
     template<typename ...A>
     int error(int retcode, ConstCharRange fmt, A &&...args) {
         ostd::err.write(progname, ": ");
-        ostd::err.writefln(fmt, ostd::forward<A>(args)...);
+        ostd::err.writefln(fmt, std::forward<A>(args)...);
         return retcode;
     }
 
     int exec_list(
-        Vector<SubRule> const &rlist, Vector<String> &subdeps,
+        std::vector<SubRule> const &rlist, std::vector<String> &subdeps,
         ConstCharRange tname
     ) {
         String repd;
-        for (auto &sr: rlist.iter()) {
-            for (auto &target: sr.rule->deps.iter()) {
+        for (auto &sr: rlist) {
+            for (auto &target: sr.rule->deps) {
                 ConstCharRange atgt = target.iter();
                 repd.clear();
                 auto lp = ostd::find(atgt, '%');
@@ -363,7 +364,7 @@ struct ObState: CsState {
                     }
                     atgt = repd.iter();
                 }
-                subdeps.push(atgt);
+                subdeps.push_back(atgt);
                 int r = exec_rule(atgt, tname);
                 if (r) {
                     return r;
@@ -373,14 +374,14 @@ struct ObState: CsState {
         return 0;
     }
 
-    int exec_func(ConstCharRange tname, Vector<SubRule> const &rlist) {
-        Vector<String> subdeps;
+    int exec_func(ConstCharRange tname, std::vector<SubRule> const &rlist) {
+        std::vector<String> subdeps;
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
         CsBytecodeRef *func = nullptr;
         bool act = false;
-        for (auto &sr: rlist.iter()) {
+        for (auto &sr: rlist) {
             if (sr.rule->func) {
                 func = &sr.rule->func;
                 act = sr.rule->action;
@@ -422,15 +423,16 @@ struct ObState: CsState {
         return run_int(rule->func);
     }
 
-    int find_rules(ConstCharRange target, Vector<SubRule> &rlist) {
+    int find_rules(ConstCharRange target, std::vector<SubRule> &rlist) {
         if (!rlist.empty()) {
             return 0;
         }
         SubRule *frule = nullptr;
         bool exact = false;
-        for (auto &rule: rules.iter()) {
+        for (auto &rule: rules) {
             if (target == rule.target) {
-                rlist.push().rule = &rule;
+                rlist.emplace_back();
+                rlist.back().rule = &rule;
                 if (rule.func) {
                     if (frule && exact) {
                         return error(1, "redefinition of rule '%s'", target);
@@ -439,7 +441,7 @@ struct ObState: CsState {
                         frule = &rlist.back();
                     } else {
                         *frule = rlist.back();
-                        rlist.pop();
+                        rlist.pop_back();
                     }
                     exact = true;
                 }
@@ -450,7 +452,8 @@ struct ObState: CsState {
             }
             ConstCharRange sub = ob_compare_subst(target, rule.target);
             if (!sub.empty()) {
-                SubRule &sr = rlist.push();
+                rlist.emplace_back();
+                SubRule &sr = rlist.back();
                 sr.rule = &rule;
                 sr.sub = sub;
                 if (frule) {
@@ -459,7 +462,7 @@ struct ObState: CsState {
                     }
                     if (sub.size() < frule->sub.size()) {
                         *frule = sr;
-                        rlist.pop();
+                        rlist.pop_back();
                     }
                 } else {
                     frule = &sr;
@@ -470,7 +473,7 @@ struct ObState: CsState {
     }
 
     int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
-        Vector<SubRule> &rlist = cache[target];
+        std::vector<SubRule> &rlist = cache[target];
         int fret = find_rules(target, rlist);
         if (fret) {
             return fret;
@@ -502,13 +505,14 @@ struct ObState: CsState {
     ) {
         cscript::util::ListParser p{cs, tgt};
         while (p.parse()) {
-            Rule &r = rules.push();
+            rules.emplace_back();
+            Rule &r = rules.back();
             r.target = p.get_item();
             r.action = action;
             r.func = cscript::cs_code_is_empty(body) ? nullptr : body;
             cscript::util::ListParser lp{cs, dep};
             while (lp.parse()) {
-                r.deps.push(lp.get_item());
+                r.deps.push_back(lp.get_item());
             }
         }
     }
@@ -518,7 +522,7 @@ struct ObState: CsState {
         ConstCharRange dep, bool inherit_deps
     ) {
         Rule *oldr = nullptr;
-        for (auto &rule: rules.iter()) {
+        for (auto &rule: rules) {
             if (ptgt == rule.target) {
                 oldr = &rule;
                 break;
@@ -527,7 +531,8 @@ struct ObState: CsState {
         if (!oldr) {
             return;
         }
-        Rule &r = rules.push();
+        rules.emplace_back();
+        Rule &r = rules.back();
         r.target = tgt;
         r.action = oldr->action;
         r.func = oldr->func;
@@ -536,7 +541,7 @@ struct ObState: CsState {
         } else {
             cscript::util::ListParser p{cs, dep};
             while (p.parse()) {
-                r.deps.push(p.get_item());
+                r.deps.push_back(p.get_item());
             }
         }
     }

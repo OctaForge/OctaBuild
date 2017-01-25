@@ -255,7 +255,7 @@ static ConstCharRange ob_compare_subst(
     if (expanded.size() <= rep.size()) {
         return nullptr;
     }
-    ostd::Size es = expanded.size();
+    size_t es = expanded.size();
     if (expanded.slice(es - rep.size(), es) != rep) {
         return nullptr;
     }

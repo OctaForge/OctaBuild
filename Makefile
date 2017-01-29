@@ -5,7 +5,7 @@ OCTASTD_PATH = ../octastd
 
 FILES = main.o
 
-OB_CXXFLAGS += -std=c++14 -I. -I$(CUBESCRIPT_PATH)/include -I$(OCTASTD_PATH) -pthread
+OB_CXXFLAGS += -std=c++1z -I. -I$(CUBESCRIPT_PATH)/include -I$(OCTASTD_PATH) -pthread
 
 all: obuild
 

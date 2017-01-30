@@ -21,7 +21,6 @@
 
 using ostd::ConstCharRange;
 using ostd::Map;
-using ostd::String;
 using ostd::slice_until;
 
 using cscript::CsState;
@@ -88,11 +87,13 @@ static bool ob_path_matches(
     return fn.empty();
 }
 
-static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne = false);
+static bool ob_expand_glob(
+    std::string &ret, ConstCharRange src, bool ne = false
+);
 
 static bool ob_expand_dir(
-    String &ret, ConstCharRange dir, std::vector<ConstCharRange> const &parts,
-    ConstCharRange slash
+    std::string &ret, ConstCharRange dir,
+    std::vector<ConstCharRange> const &parts, ConstCharRange slash
 ) {
     ostd::DirectoryStream d(dir);
     bool appended = false;
@@ -105,7 +106,7 @@ static bool ob_expand_dir(
         if (!ob_path_matches(fn, parts)) {
             continue;
         }
-        String afn((dir == ".") ? "" : "./");
+        std::string afn((dir == ".") ? "" : "./");
         afn.append(fn);
         /* if we reach this, we match; try recursively matching */
         if (!slash.empty()) {
@@ -113,7 +114,7 @@ static bool ob_expand_dir(
             ConstCharRange psl = slash + 1;
             if (!ostd::find(psl, '*').empty()) {
                 if (!appended) {
-                    appended = ob_expand_glob(ret, afn.iter());
+                    appended = ob_expand_glob(ret, ostd::iter(afn));
                 }
                 continue;
             }
@@ -122,14 +123,14 @@ static bool ob_expand_dir(
                 continue;
             }
             if (!ret.empty()) {
-                ret.push(' ');
+                ret.push_back(' ');
             }
             ret.append(afn);
             appended = true;
             continue;
         }
         if (!ret.empty()) {
-            ret.push(' ');
+            ret.push_back(' ');
         }
         ret.append(afn);
         appended = true;
@@ -137,13 +138,13 @@ static bool ob_expand_dir(
     return appended;
 }
 
-static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
+static bool ob_expand_glob(std::string &ret, ConstCharRange src, bool ne) {
     ConstCharRange star = ostd::find(src, '*');
     /* no star use as-is */
     if (star.empty()) {
         if (ne) return false;
         if (!ret.empty()) {
-            ret.push(' ');
+            ret.push_back(' ');
         }
         ret.append(src);
         return false;
@@ -177,7 +178,7 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
             return false;
         }
         if (!ret.empty()) {
-            ret.push(' ');
+            ret.push_back(' ');
         }
         ret.append(src);
         return false;
@@ -187,7 +188,9 @@ static bool ob_expand_glob(String &ret, ConstCharRange src, bool ne) {
 
 /* check funcs */
 
-static bool ob_check_ts(ConstCharRange tname, std::vector<String> const &deps) {
+static bool ob_check_ts(
+    ConstCharRange tname, std::vector<std::string> const &deps
+) {
     auto get_ts = [](ConstCharRange fname) {
         ostd::FileInfo fi(fname);
         if (fi.type() != ostd::FileType::regular) {
@@ -213,7 +216,7 @@ static bool ob_check_file(ConstCharRange fname) {
 }
 
 static bool ob_check_exec(
-    ConstCharRange tname, std::vector<String> const &deps
+    ConstCharRange tname, std::vector<std::string> const &deps
 ) {
     if (!ob_check_file(tname)) {
         return true;
@@ -271,8 +274,8 @@ struct ObState: CsState {
 
     /* represents a rule definition, possibly with a function */
     struct Rule {
-        String target;
-        std::vector<String> deps;
+        std::string target;
+        std::vector<std::string> deps;
         CsBytecodeRef func;
         bool action;
 
@@ -346,13 +349,13 @@ struct ObState: CsState {
     }
 
     int exec_list(
-        std::vector<SubRule> const &rlist, std::vector<String> &subdeps,
+        std::vector<SubRule> const &rlist, std::vector<std::string> &subdeps,
         ConstCharRange tname
     ) {
-        String repd;
+        std::string repd;
         for (auto &sr: rlist) {
             for (auto &target: sr.rule->deps) {
-                ConstCharRange atgt = target.iter();
+                ConstCharRange atgt = ostd::iter(target);
                 repd.clear();
                 auto lp = ostd::find(atgt, '%');
                 if (!lp.empty()) {
@@ -362,9 +365,9 @@ struct ObState: CsState {
                     if (!lp.empty()) {
                         repd.append(lp);
                     }
-                    atgt = repd.iter();
+                    atgt = ostd::iter(repd);
                 }
-                subdeps.push_back(atgt);
+                subdeps.push_back(std::string{atgt});
                 int r = exec_rule(atgt, tname);
                 if (r) {
                     return r;
@@ -375,7 +378,7 @@ struct ObState: CsState {
     }
 
     int exec_func(ConstCharRange tname, std::vector<SubRule> const &rlist) {
-        std::vector<String> subdeps;
+        std::vector<std::string> subdeps;
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
@@ -408,7 +411,7 @@ struct ObState: CsState {
                 sourcev.set_cstr(subdeps[0]);
                 sourcev.push();
 
-                auto dsv = ostd::appender<String>();
+                auto dsv = ostd::appender<std::string>();
                 ostd::concat(dsv, subdeps);
                 sourcesv.set_str(std::move(dsv.get()));
                 sourcesv.push();
@@ -654,7 +657,7 @@ int main(int argc, char **argv) {
     os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &res) {
         auto cnt = os.counters.back();
         cnt->incr();
-        tpool.push([cnt, ds = String(args[0].get_strr())]() {
+        tpool.push([cnt, ds = std::string(args[0].get_strr())]() {
             int ret = system(ds.data());
             if (ret && !cnt->get_result()) {
                 cnt->get_result() = ret;
@@ -678,7 +681,7 @@ int main(int argc, char **argv) {
         ConstCharRange lst = args[0].get_strr();
         ConstCharRange oldext = args[1].get_strr();
         ConstCharRange newext = args[2].get_strr();
-        String ret;
+        std::string ret;
         if (oldext.front() == '.') {
             oldext.pop_front();
         }
@@ -688,7 +691,7 @@ int main(int argc, char **argv) {
         cscript::util::ListParser p{cs, lst};
         while (p.parse()) {
             auto elem = p.get_item();
-            ConstCharRange it = elem.iter();
+            ConstCharRange it = ostd::iter(elem);
             if (!ret.empty()) {
                 ret += ' ';
             }
@@ -709,7 +712,7 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
-        String ret;
+        std::string ret;
         cscript::util::ListParser p{cs, args[0].get_strr()};
         while (p.parse()) {
             ob_expand_glob(ret, p.get_item());

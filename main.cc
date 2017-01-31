@@ -3,12 +3,12 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <unordered_map>
 
 #include <ostd/types.hh>
 #include <ostd/vector.hh>
 #include <ostd/functional.hh>
 #include <ostd/string.hh>
-#include <ostd/map.hh>
 #include <ostd/filesystem.hh>
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
@@ -20,7 +20,6 @@
 #include "tpool.hh"
 
 using ostd::ConstCharRange;
-using ostd::Map;
 using ostd::slice_until;
 
 using cscript::CsState;
@@ -292,7 +291,7 @@ struct ObState: CsState {
         Rule *rule;
     };
 
-    Map<ConstCharRange, std::vector<SubRule>> cache;
+    std::unordered_map<ConstCharRange, std::vector<SubRule>> cache;
 
     struct RuleCounter {
         RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}

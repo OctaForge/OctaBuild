@@ -7,7 +7,6 @@
 
 #include <ostd/types.hh>
 #include <ostd/vector.hh>
-#include <ostd/functional.hh>
 #include <ostd/string.hh>
 #include <ostd/filesystem.hh>
 #include <ostd/io.hh>

@@ -21,12 +21,12 @@
 using ostd::ConstCharRange;
 using ostd::slice_until;
 
-using cscript::CsState;
-using cscript::CsValueRange;
-using cscript::CsValue;
-using cscript::CsStackedValue;
-using cscript::CsBytecodeRef;
-using cscript::CsBytecode;
+using cscript::cs_state;
+using cscript::cs_value_r;
+using cscript::cs_value;
+using cscript::cs_stacked_value;
+using cscript::cs_bcode_ref;
+using cscript::cs_bcode;
 
 /* glob matching code */
 
@@ -266,7 +266,7 @@ static ConstCharRange ob_compare_subst(
     return expanded;
 }
 
-struct ObState: CsState {
+struct ObState: cs_state {
     ConstCharRange progname;
     bool ignore_env = false;
 
@@ -274,7 +274,7 @@ struct ObState: CsState {
     struct Rule {
         std::string target;
         std::vector<std::string> deps;
-        CsBytecodeRef func;
+        cs_bcode_ref func;
         bool action;
 
         Rule(): target(), deps(), func(), action(false) {}
@@ -380,7 +380,7 @@ struct ObState: CsState {
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
         });
-        CsBytecodeRef *func = nullptr;
+        cs_bcode_ref *func = nullptr;
         bool act = false;
         for (auto &sr: rlist) {
             if (sr.rule->func) {
@@ -390,7 +390,7 @@ struct ObState: CsState {
             }
         }
         if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
-            CsStackedValue targetv, sourcev, sourcesv;
+            cs_stacked_value targetv, sourcev, sourcesv;
 
             if (!targetv.set_alias(new_ident("target"))) {
                 return 1;
@@ -501,7 +501,7 @@ struct ObState: CsState {
     }
 
     void rule_add(
-        CsState &cs, ConstCharRange tgt, ConstCharRange dep, CsBytecode *body,
+        cs_state &cs, ConstCharRange tgt, ConstCharRange dep, cs_bcode *body,
         bool action = false
     ) {
         cscript::util::ListParser p{cs, tgt};
@@ -519,7 +519,7 @@ struct ObState: CsState {
     }
 
     void rule_dup(
-        CsState &cs, ConstCharRange tgt, ConstCharRange ptgt,
+        cs_state &cs, ConstCharRange tgt, ConstCharRange ptgt,
         ConstCharRange dep, bool inherit_deps
     ) {
         Rule *oldr = nullptr;

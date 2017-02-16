@@ -11,7 +11,6 @@
 #include <ostd/filesystem.hh>
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
-#include <ostd/utility.hh>
 #include <ostd/environ.hh>
 
 #include <cubescript/cubescript.hh>
@@ -93,7 +92,7 @@ static bool ob_expand_dir(
     std::string &ret, string_range dir,
     std::vector<string_range> const &parts, string_range slash
 ) {
-    ostd::DirectoryStream d(dir);
+    ostd::directory_stream d{dir};
     bool appended = false;
     if (!d.is_open()) {
         return false;
@@ -117,7 +116,7 @@ static bool ob_expand_dir(
                 continue;
             }
             /* no further star, just do file test */
-            if (!ostd::FileStream(afn, ostd::StreamMode::read).is_open()) {
+            if (!ostd::file_stream{afn, ostd::stream_mode::READ}.is_open()) {
                 continue;
             }
             if (!ret.empty()) {
@@ -190,8 +189,8 @@ static bool ob_check_ts(
     string_range tname, std::vector<std::string> const &deps
 ) {
     auto get_ts = [](string_range fname) {
-        ostd::FileInfo fi(fname);
-        if (fi.type() != ostd::FileType::regular) {
+        ostd::file_info fi{fname};
+        if (fi.type() != ostd::file_type::REGULAR) {
             return time_t(0);
         }
         return fi.mtime();
@@ -210,7 +209,7 @@ static bool ob_check_ts(
 }
 
 static bool ob_check_file(string_range fname) {
-    return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
+    return ostd::file_stream{fname, ostd::stream_mode::READ}.is_open();
 }
 
 static bool ob_check_exec(
@@ -573,7 +572,7 @@ struct ObState: cs_state {
     }
 
     int print_help(bool is_error, string_range deffile) {
-        ostd::Stream &os = is_error ? ostd::err : ostd::out;
+        ostd::stream &os = is_error ? ostd::err : ostd::out;
         os.writeln(
             "Usage: ", progname,  " [options] [action]\n",
             "Options:\n"

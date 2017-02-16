@@ -18,7 +18,7 @@
 
 #include "tpool.hh"
 
-using ostd::ConstCharRange;
+using ostd::string_range;
 using ostd::slice_until;
 
 using cscript::cs_state;
@@ -31,11 +31,11 @@ using cscript::cs_bcode;
 /* glob matching code */
 
 static void ob_get_path_parts(
-    std::vector<ConstCharRange> &parts, ConstCharRange elem
+    std::vector<string_range> &parts, string_range elem
 ) {
-    ConstCharRange star = ostd::find(elem, '*');
+    string_range star = ostd::find(elem, '*');
     while (!star.empty()) {
-        ConstCharRange ep = slice_until(elem, star);
+        string_range ep = slice_until(elem, star);
         if (!ep.empty()) {
             parts.push_back(ep);
         }
@@ -50,10 +50,10 @@ static void ob_get_path_parts(
 }
 
 static bool ob_path_matches(
-    ConstCharRange fn, std::vector<ConstCharRange> const &parts
+    string_range fn, std::vector<string_range> const &parts
 ) {
     for (auto it = ostd::iter(parts); !it.empty(); ++it) {
-        ConstCharRange elem = it.front();
+        string_range elem = it.front();
         if (elem == "*") {
             ++it;
             /* skip multiple stars if present */
@@ -86,12 +86,12 @@ static bool ob_path_matches(
 }
 
 static bool ob_expand_glob(
-    std::string &ret, ConstCharRange src, bool ne = false
+    std::string &ret, string_range src, bool ne = false
 );
 
 static bool ob_expand_dir(
-    std::string &ret, ConstCharRange dir,
-    std::vector<ConstCharRange> const &parts, ConstCharRange slash
+    std::string &ret, string_range dir,
+    std::vector<string_range> const &parts, string_range slash
 ) {
     ostd::DirectoryStream d(dir);
     bool appended = false;
@@ -99,7 +99,7 @@ static bool ob_expand_dir(
         return false;
     }
     for (auto fi: d.iter()) {
-        ConstCharRange fn = fi.filename();
+        string_range fn = fi.filename();
         /* check if filename matches */
         if (!ob_path_matches(fn, parts)) {
             continue;
@@ -109,7 +109,7 @@ static bool ob_expand_dir(
         /* if we reach this, we match; try recursively matching */
         if (!slash.empty()) {
             afn.append(slash);
-            ConstCharRange psl = slash + 1;
+            string_range psl = slash + 1;
             if (!ostd::find(psl, '*').empty()) {
                 if (!appended) {
                     appended = ob_expand_glob(ret, ostd::iter(afn));
@@ -136,8 +136,8 @@ static bool ob_expand_dir(
     return appended;
 }
 
-static bool ob_expand_glob(std::string &ret, ConstCharRange src, bool ne) {
-    ConstCharRange star = ostd::find(src, '*');
+static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
+    string_range star = ostd::find(src, '*');
     /* no star use as-is */
     if (star.empty()) {
         if (ne) return false;
@@ -148,28 +148,28 @@ static bool ob_expand_glob(std::string &ret, ConstCharRange src, bool ne) {
         return false;
     }
     /* part before star */
-    ConstCharRange prestar = slice_until(src, star);
+    string_range prestar = slice_until(src, star);
     /* try finding slash before star */
-    ConstCharRange slash = ostd::find_last(prestar, '/');
+    string_range slash = ostd::find_last(prestar, '/');
     /* directory to scan */
-    ConstCharRange dir = ".";
+    string_range dir = ".";
     /* part of name before star */
-    ConstCharRange fnpre = prestar;
+    string_range fnpre = prestar;
     if (!slash.empty()) {
         /* there was slash, adjust directory + prefix accordingly */
         dir = slice_until(src, slash);
         fnpre = slash + 1;
     }
     /* part after star */
-    ConstCharRange fnpost = star + 1;
+    string_range fnpost = star + 1;
     /* if a slash follows, adjust */
-    ConstCharRange nslash = ostd::find(fnpost, '/');
+    string_range nslash = ostd::find(fnpost, '/');
     if (!nslash.empty()) {
         fnpost = slice_until(fnpost, nslash);
     }
     /* retrieve the single element with whatever stars in it, chop it up */
-    std::vector<ConstCharRange> parts;
-    ob_get_path_parts(parts, ConstCharRange(&fnpre[0], &fnpost[fnpost.size()]));
+    std::vector<string_range> parts;
+    ob_get_path_parts(parts, string_range(&fnpre[0], &fnpost[fnpost.size()]));
     /* do a directory scan and match */
     if (!ob_expand_dir(ret, dir, parts, nslash)) {
         if (ne) {
@@ -187,9 +187,9 @@ static bool ob_expand_glob(std::string &ret, ConstCharRange src, bool ne) {
 /* check funcs */
 
 static bool ob_check_ts(
-    ConstCharRange tname, std::vector<std::string> const &deps
+    string_range tname, std::vector<std::string> const &deps
 ) {
-    auto get_ts = [](ConstCharRange fname) {
+    auto get_ts = [](string_range fname) {
         ostd::FileInfo fi(fname);
         if (fi.type() != ostd::FileType::regular) {
             return time_t(0);
@@ -209,12 +209,12 @@ static bool ob_check_ts(
     return false;
 }
 
-static bool ob_check_file(ConstCharRange fname) {
+static bool ob_check_file(string_range fname) {
     return ostd::FileStream(fname, ostd::StreamMode::read).is_open();
 }
 
 static bool ob_check_exec(
-    ConstCharRange tname, std::vector<std::string> const &deps
+    string_range tname, std::vector<std::string> const &deps
 ) {
     if (!ob_check_file(tname)) {
         return true;
@@ -228,8 +228,8 @@ static bool ob_check_exec(
 }
 
 /* this lets us properly match % patterns in target names */
-static ConstCharRange ob_compare_subst(
-    ConstCharRange expanded, ConstCharRange toexpand
+static string_range ob_compare_subst(
+    string_range expanded, string_range toexpand
 ) {
     auto rep = ostd::find(toexpand, '%');
     /* no subst found */
@@ -267,7 +267,7 @@ static ConstCharRange ob_compare_subst(
 }
 
 struct ObState: cs_state {
-    ConstCharRange progname;
+    string_range progname;
     bool ignore_env = false;
 
     /* represents a rule definition, possibly with a function */
@@ -286,11 +286,11 @@ struct ObState: cs_state {
     std::vector<Rule> rules;
 
     struct SubRule {
-        ConstCharRange sub;
+        string_range sub;
         Rule *rule;
     };
 
-    std::unordered_map<ConstCharRange, std::vector<SubRule>> cache;
+    std::unordered_map<string_range, std::vector<SubRule>> cache;
 
     struct RuleCounter {
         RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}
@@ -340,7 +340,7 @@ struct ObState: cs_state {
     }
 
     template<typename ...A>
-    int error(int retcode, ConstCharRange fmt, A &&...args) {
+    int error(int retcode, string_range fmt, A &&...args) {
         ostd::err.write(progname, ": ");
         ostd::err.writefln(fmt, std::forward<A>(args)...);
         return retcode;
@@ -348,12 +348,12 @@ struct ObState: cs_state {
 
     int exec_list(
         std::vector<SubRule> const &rlist, std::vector<std::string> &subdeps,
-        ConstCharRange tname
+        string_range tname
     ) {
         std::string repd;
         for (auto &sr: rlist) {
             for (auto &target: sr.rule->deps) {
-                ConstCharRange atgt = ostd::iter(target);
+                string_range atgt = ostd::iter(target);
                 repd.clear();
                 auto lp = ostd::find(atgt, '%');
                 if (!lp.empty()) {
@@ -375,7 +375,7 @@ struct ObState: cs_state {
         return 0;
     }
 
-    int exec_func(ConstCharRange tname, std::vector<SubRule> const &rlist) {
+    int exec_func(string_range tname, std::vector<SubRule> const &rlist) {
         std::vector<std::string> subdeps;
         int ret = wait_result([&rlist, &subdeps, &tname, this]() {
             return exec_list(rlist, subdeps, tname);
@@ -424,14 +424,14 @@ struct ObState: cs_state {
         return run_int(rule->func);
     }
 
-    int find_rules(ConstCharRange target, std::vector<SubRule> &rlist) {
+    int find_rules(string_range target, std::vector<SubRule> &rlist) {
         if (!rlist.empty()) {
             return 0;
         }
         SubRule *frule = nullptr;
         bool exact = false;
         for (auto &rule: rules) {
-            if (target == rule.target) {
+            if (target == string_range{rule.target}) {
                 rlist.emplace_back();
                 rlist.back().rule = &rule;
                 if (rule.func) {
@@ -451,7 +451,7 @@ struct ObState: cs_state {
             if (exact || !rule.func) {
                 continue;
             }
-            ConstCharRange sub = ob_compare_subst(target, rule.target);
+            string_range sub = ob_compare_subst(target, rule.target);
             if (!sub.empty()) {
                 rlist.emplace_back();
                 SubRule &sr = rlist.back();
@@ -473,7 +473,7 @@ struct ObState: cs_state {
         return 0;
     }
 
-    int exec_rule(ConstCharRange target, ConstCharRange from = nullptr) {
+    int exec_rule(string_range target, string_range from = nullptr) {
         std::vector<SubRule> &rlist = cache[target];
         int fret = find_rules(target, rlist);
         if (fret) {
@@ -496,12 +496,12 @@ struct ObState: cs_state {
         return exec_func(target, rlist);
     }
 
-    int exec_main(ConstCharRange target) {
+    int exec_main(string_range target) {
         return wait_result([&target, this]() { return exec_rule(target); });
     }
 
     void rule_add(
-        cs_state &cs, ConstCharRange tgt, ConstCharRange dep, cs_bcode *body,
+        cs_state &cs, string_range tgt, string_range dep, cs_bcode *body,
         bool action = false
     ) {
         cscript::util::ListParser p{cs, tgt};
@@ -519,12 +519,12 @@ struct ObState: cs_state {
     }
 
     void rule_dup(
-        cs_state &cs, ConstCharRange tgt, ConstCharRange ptgt,
-        ConstCharRange dep, bool inherit_deps
+        cs_state &cs, string_range tgt, string_range ptgt,
+        string_range dep, bool inherit_deps
     ) {
         Rule *oldr = nullptr;
         for (auto &rule: rules) {
-            if (ptgt == rule.target) {
+            if (ptgt == string_range{rule.target}) {
                 oldr = &rule;
                 break;
             }
@@ -572,7 +572,7 @@ struct ObState: cs_state {
         });
     }
 
-    int print_help(bool is_error, ConstCharRange deffile) {
+    int print_help(bool is_error, string_range deffile) {
         ostd::Stream &os = is_error ? ostd::err : ostd::out;
         os.writeln(
             "Usage: ", progname,  " [options] [action]\n",
@@ -590,8 +590,8 @@ struct ObState: cs_state {
 
 int main(int argc, char **argv) {
     ObState os;
-    ConstCharRange pn = argv[0];
-    ConstCharRange lslash = ostd::find_last(pn, '/');
+    string_range pn = argv[0];
+    string_range lslash = ostd::find_last(pn, '/');
     os.progname = lslash.empty() ? pn : (lslash + 1);
 
     os.init_libs();
@@ -599,8 +599,8 @@ int main(int argc, char **argv) {
     int ncpus = std::thread::hardware_concurrency();
     os.new_ivar("numcpus", 4096, 1, ncpus);
 
-    ConstCharRange fcont;
-    ConstCharRange deffile = "obuild.cfg";
+    string_range fcont;
+    string_range deffile = "obuild.cfg";
 
     int jobs = 1, posarg = argc;
     for (int i = 1; i < argc; ++i) {
@@ -612,7 +612,7 @@ int main(int argc, char **argv) {
             } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
                 return os.print_help(argn != 'h', deffile);
             }
-            ConstCharRange val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
+            string_range val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
             switch (argn) {
                 case 'C':
                     if (!ostd::directory_change(val)) {
@@ -676,9 +676,9 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("extreplace", "sss", [](auto &cs, auto args, auto &res) {
-        ConstCharRange lst = args[0].get_strr();
-        ConstCharRange oldext = args[1].get_strr();
-        ConstCharRange newext = args[2].get_strr();
+        string_range lst = args[0].get_strr();
+        string_range oldext = args[1].get_strr();
+        string_range newext = args[2].get_strr();
         std::string ret;
         if (oldext.front() == '.') {
             oldext.pop_front();
@@ -689,7 +689,7 @@ int main(int argc, char **argv) {
         cscript::util::ListParser p{cs, lst};
         while (p.parse()) {
             auto elem = p.get_item();
-            ConstCharRange it = ostd::iter(elem);
+            string_range it = ostd::iter(elem);
             if (!ret.empty()) {
                 ret += ' ';
             }

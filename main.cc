@@ -408,7 +408,7 @@ struct ObState: cs_state {
                 sourcev.set_cstr(subdeps[0]);
                 sourcev.push();
 
-                auto dsv = ostd::appender<std::string>();
+                auto dsv = ostd::appender_range<std::string>{};
                 ostd::concat(dsv, subdeps);
                 sourcesv.set_str(std::move(dsv.get()));
                 sourcesv.push();

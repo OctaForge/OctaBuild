@@ -629,7 +629,7 @@ int main(int argc, char **argv) {
                     if (!ival) {
                         ival = ncpus;
                     }
-                    jobs = ostd::max(1, ival);
+                    jobs = std::max(1, ival);
                     break;
                 }
                 default:

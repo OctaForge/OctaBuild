@@ -8,6 +8,7 @@
 #include <ostd/types.hh>
 #include <ostd/vector.hh>
 #include <ostd/string.hh>
+#include <ostd/format.hh>
 #include <ostd/filesystem.hh>
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
@@ -409,7 +410,7 @@ struct ObState: cs_state {
                 sourcev.push();
 
                 auto dsv = ostd::appender_range<std::string>{};
-                ostd::concat(dsv, subdeps);
+                ostd::format(dsv, "%(%s %)", subdeps);
                 sourcesv.set_str(std::move(dsv.get()));
                 sourcesv.push();
             }

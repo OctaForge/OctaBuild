@@ -28,6 +28,8 @@ using cscript::cs_stacked_value;
 using cscript::cs_bcode_ref;
 using cscript::cs_bcode;
 
+namespace fs = ostd::filesystem;
+
 /* glob matching code */
 
 static void ob_get_path_parts(
@@ -93,13 +95,15 @@ static bool ob_expand_dir(
     std::string &ret, string_range dir,
     std::vector<string_range> const &parts, string_range slash
 ) {
-    ostd::directory_stream d{dir};
-    bool appended = false;
-    if (!d.is_open()) {
+    fs::directory_iterator d;
+    try {
+        d = fs::directory_iterator{std::string{dir}};
+    } catch (fs::filesystem_error const &) {
         return false;
     }
-    for (auto fi: d.iter()) {
-        string_range fn = fi.filename();
+    bool appended = false;
+    for (auto &fi: d) {
+        std::string fn = fs::path{fi}.filename().string();
         /* check if filename matches */
         if (!ob_path_matches(fn, parts)) {
             continue;
@@ -190,19 +194,19 @@ static bool ob_check_ts(
     string_range tname, std::vector<std::string> const &deps
 ) {
     auto get_ts = [](string_range fname) {
-        ostd::file_info fi{fname};
-        if (fi.type() != ostd::file_type::REGULAR) {
-            return time_t(0);
+        fs::path p{std::string{fname}};
+        if (!fs::is_regular_file(p)) {
+            return fs::file_time_type{};
         }
-        return fi.mtime();
+        return fs::last_write_time(p);
     };
-    time_t tts = get_ts(tname);
-    if (!tts) {
+    auto tts = get_ts(tname);
+    if (tts == fs::file_time_type{}) {
         return true;
     }
     for (auto &dep: deps) {
-        time_t sts = get_ts(dep);
-        if (sts && (tts < sts)) {
+        auto sts = get_ts(dep);
+        if ((sts != fs::file_time_type{}) && (tts < sts)) {
             return true;
         }
     }
@@ -341,8 +345,8 @@ struct ObState: cs_state {
 
     template<typename ...A>
     int error(int retcode, string_range fmt, A &&...args) {
-        ostd::err.write(progname, ": ");
-        ostd::err.writefln(fmt, std::forward<A>(args)...);
+        ostd::cerr.write(progname, ": ");
+        ostd::cerr.writefln(fmt, std::forward<A>(args)...);
         return retcode;
     }
 
@@ -573,7 +577,7 @@ struct ObState: cs_state {
     }
 
     int print_help(bool is_error, string_range deffile) {
-        ostd::stream &os = is_error ? ostd::err : ostd::out;
+        ostd::stream &os = is_error ? ostd::cerr : ostd::cout;
         os.writeln(
             "Usage: ", progname,  " [options] [action]\n",
             "Options:\n"
@@ -615,8 +619,13 @@ int main(int argc, char **argv) {
             string_range val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
             switch (argn) {
                 case 'C':
-                    if (!ostd::directory_change(val)) {
-                        return os.error(1, "failed changing directory: %s", val);
+                    try {
+                        fs::current_path(std::string{val});
+                    } catch (fs::filesystem_error const &e) {
+                        return os.error(
+                            1, "failed changing directory: %s (%s)",
+                            val, e.what()
+                        );
                     }
                     break;
                 case 'f':

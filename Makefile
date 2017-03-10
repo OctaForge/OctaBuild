@@ -10,8 +10,8 @@ OB_CXXFLAGS += -std=c++1z -I. -I$(CUBESCRIPT_PATH)/include -I$(OCTASTD_PATH) -pt
 all: obuild
 
 obuild: $(FILES)
-	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) $(LDFLAGS) -o obuild $(FILES) \
-	$(CUBESCRIPT_PATH)/libcubescript.a
+	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) -o obuild $(FILES) \
+	$(CUBESCRIPT_PATH)/libcubescript.a $(OCTASTD_PATH)/libostd.a $(LDFLAGS)
 
 .cc.o:
 	$(CXX) $(CXXFLAGS) $(OB_CXXFLAGS) -c -o $@ $<

@@ -13,10 +13,9 @@
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
 #include <ostd/environ.hh>
+#include <ostd/thread_pool.hh>
 
 #include <cubescript/cubescript.hh>
-
-#include "tpool.hh"
 
 using ostd::string_range;
 using ostd::slice_until;
@@ -652,8 +651,8 @@ int main(int argc, char **argv) {
     }
     os.new_ivar("numjobs", 4096, 1, jobs);
 
-    thread_pool tpool;
-    tpool.init(jobs);
+    ostd::thread_pool tpool;
+    tpool.start(jobs);
 
     os.register_rulecmds();
 

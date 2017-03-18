@@ -19,4 +19,4 @@ obuild: $(FILES)
 clean:
 	rm -f $(FILES) obuild
 
-main.o: tpool.hh $(CUBESCRIPT_PATH)/include/cubescript/cubescript.hh
+main.o: $(CUBESCRIPT_PATH)/include/cubescript/cubescript.hh

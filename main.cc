@@ -79,7 +79,7 @@ static bool ob_path_matches(
         if (fn.slice(0, elem.size()) != elem) {
             return false;
         }
-        fn += elem.size();
+        fn = fn.slice(elem.size(), fn.size());
     }
     /* if there are no chars in the fname remaining, we fully matched */
     return fn.empty();
@@ -111,7 +111,7 @@ static bool ob_expand_dir(
         /* if we reach this, we match; try recursively matching */
         if (!slash.empty()) {
             afn.append(slash);
-            string_range psl = slash + 1;
+            string_range psl = slash.slice(1, slash.size());
             if (!ostd::find(psl, '*').empty()) {
                 if (!appended) {
                     appended = ob_expand_glob(ret, ostd::iter(afn));
@@ -160,10 +160,10 @@ static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
     if (!slash.empty()) {
         /* there was slash, adjust directory + prefix accordingly */
         dir = src.slice(0, &slash[0] - &src[0]);
-        fnpre = slash + 1;
+        fnpre = slash.slice(1, slash.size());
     }
     /* part after star */
-    string_range fnpost = star + 1;
+    string_range fnpost = star.slice(1, star.size());
     /* if a slash follows, adjust */
     string_range nslash = ostd::find(fnpost, '/');
     if (!nslash.empty()) {
@@ -248,7 +248,7 @@ static string_range ob_compare_subst(
         return nullptr;
     }
     /* pop out front part */
-    expanded += fp.size();
+    expanded = expanded.slice(fp.size(), expanded.size());
     /* part after % */
     ++rep;
     if (rep.empty()) {
@@ -263,7 +263,7 @@ static string_range ob_compare_subst(
         return nullptr;
     }
     /* cut off latter part */
-    expanded.pop_back_n(rep.size());
+    expanded = expanded.slice(0, expanded.size() - rep.size());
     /* we got what we wanted... */
     return expanded;
 }
@@ -594,7 +594,7 @@ int main(int argc, char **argv) {
     ObState os;
     string_range pn = argv[0];
     string_range lslash = ostd::find_last(pn, '/');
-    os.progname = lslash.empty() ? pn : (lslash + 1);
+    os.progname = lslash.empty() ? pn : lslash.slice(1, lslash.size());
 
     os.init_libs();
 
@@ -701,7 +701,7 @@ int main(int argc, char **argv) {
                 ret += ' ';
             }
             auto dot = ostd::find_last(it, '.');
-            if (!dot.empty() && ((dot + 1) == oldext)) {
+            if (!dot.empty() && (dot.slice(1, dot.size()) == oldext)) {
                 ret += it.slice(0, &dot[0] - &it[0]);
                 ret += '.';
                 ret += newext;

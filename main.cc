@@ -18,7 +18,6 @@
 #include <cubescript/cubescript.hh>
 
 using ostd::string_range;
-using ostd::slice_until;
 
 using cscript::cs_state;
 using cscript::cs_value_r;
@@ -36,7 +35,7 @@ static void ob_get_path_parts(
 ) {
     string_range star = ostd::find(elem, '*');
     while (!star.empty()) {
-        string_range ep = slice_until(elem, star);
+        string_range ep = elem.slice(0, &star[0] - &elem[0]);
         if (!ep.empty()) {
             parts.push_back(ep);
         }
@@ -151,7 +150,7 @@ static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
         return false;
     }
     /* part before star */
-    string_range prestar = slice_until(src, star);
+    string_range prestar = src.slice(0, &star[0] - &src[0]);
     /* try finding slash before star */
     string_range slash = ostd::find_last(prestar, '/');
     /* directory to scan */
@@ -160,7 +159,7 @@ static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
     string_range fnpre = prestar;
     if (!slash.empty()) {
         /* there was slash, adjust directory + prefix accordingly */
-        dir = slice_until(src, slash);
+        dir = src.slice(0, &slash[0] - &src[0]);
         fnpre = slash + 1;
     }
     /* part after star */
@@ -168,7 +167,7 @@ static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
     /* if a slash follows, adjust */
     string_range nslash = ostd::find(fnpost, '/');
     if (!nslash.empty()) {
-        fnpost = slice_until(fnpost, nslash);
+        fnpost = fnpost.slice(0, &nslash[0] - &fnpost[0]);
     }
     /* retrieve the single element with whatever stars in it, chop it up */
     std::vector<string_range> parts;
@@ -240,7 +239,7 @@ static string_range ob_compare_subst(
         return nullptr;
     }
     /* get the part before % */
-    auto fp = slice_until(toexpand, rep);
+    auto fp = toexpand.slice(0, &rep[0] - &toexpand[0]);
     /* part before % does not compare, so ignore */
     if (expanded.size() <= fp.size()) {
         return nullptr;
@@ -360,7 +359,7 @@ struct ObState: cs_state {
                 repd.clear();
                 auto lp = ostd::find(atgt, '%');
                 if (!lp.empty()) {
-                    repd.append(slice_until(atgt, lp));
+                    repd.append(atgt.slice(0, &lp[0] - &atgt[0]));
                     repd.append(sr.sub);
                     ++lp;
                     if (!lp.empty()) {
@@ -703,7 +702,7 @@ int main(int argc, char **argv) {
             }
             auto dot = ostd::find_last(it, '.');
             if (!dot.empty() && ((dot + 1) == oldext)) {
-                ret += slice_until(it, dot);
+                ret += it.slice(0, &dot[0] - &it[0]);
                 ret += '.';
                 ret += newext;
             } else {

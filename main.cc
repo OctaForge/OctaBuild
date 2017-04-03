@@ -5,7 +5,6 @@
 #include <atomic>
 #include <unordered_map>
 
-#include <ostd/types.hh>
 #include <ostd/vector.hh>
 #include <ostd/string.hh>
 #include <ostd/format.hh>

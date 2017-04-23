@@ -4,8 +4,8 @@
 #include <condition_variable>
 #include <atomic>
 #include <unordered_map>
+#include <vector>
 
-#include <ostd/vector.hh>
 #include <ostd/string.hh>
 #include <ostd/format.hh>
 #include <ostd/filesystem.hh>

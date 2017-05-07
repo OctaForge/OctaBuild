@@ -267,7 +267,7 @@ static string_range ob_compare_subst(
     return expanded;
 }
 
-struct ObState: cs_state {
+struct ob_state: cs_state {
     string_range progname;
     bool ignore_env = false;
 
@@ -590,7 +590,7 @@ struct ObState: cs_state {
 };
 
 int main(int argc, char **argv) {
-    ObState os;
+    ob_state os;
     string_range pn = argv[0];
     string_range lslash = ostd::find_last(pn, '/');
     os.progname = lslash.empty() ? pn : lslash.slice(1, lslash.size());

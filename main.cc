@@ -13,6 +13,7 @@
 #include <ostd/platform.hh>
 #include <ostd/environ.hh>
 #include <ostd/thread_pool.hh>
+#include <ostd/argparse.hh>
 
 #include <cubescript/cubescript.hh>
 
@@ -572,21 +573,6 @@ struct ob_state: cs_state {
             );
         });
     }
-
-    int print_help(bool is_error, string_range deffile) {
-        ostd::stream &os = is_error ? ostd::cerr : ostd::cout;
-        os.writeln(
-            "Usage: ", progname,  " [options] [action]\n",
-            "Options:\n"
-            "  -C DIRECTORY\tChange to DIRECTORY before running.\n",
-            "  -f FILE\tSpecify the file to run (default: ", deffile, ").\n"
-            "  -h\t\tPrint this message.\n"
-            "  -j N\t\tSpecify the number of jobs to use (default: 1).\n"
-            "  -e STR\tEvaluate a string instead of a file.\n"
-            "  -E\t\tIgnore environment variables."
-        );
-        return is_error;
-    }
 };
 
 int main(int argc, char **argv) {
@@ -600,53 +586,67 @@ int main(int argc, char **argv) {
     int ncpus = std::thread::hardware_concurrency();
     os.new_ivar("numcpus", 4096, 1, ncpus);
 
-    string_range fcont;
-    string_range deffile = "obuild.cfg";
+    ostd::arg_parser ap{pn};
 
-    int jobs = 1, posarg = argc;
-    for (int i = 1; i < argc; ++i) {
-        if (argv[i][0] == '-') {
-            char argn = argv[i][1];
-            if (argn == 'E') {
-                os.ignore_env = true;
-                continue;
-            } else if ((argn == 'h') || (!argv[i][2] && ((i + 1) >= argc))) {
-                return os.print_help(argn != 'h', deffile);
-            }
-            string_range val = (argv[i][2] == '\0') ? argv[++i] : &argv[i][2];
-            switch (argn) {
-                case 'C':
-                    try {
-                        fs::current_path(std::string{val});
-                    } catch (fs::filesystem_error const &e) {
-                        return os.error(
-                            1, "failed changing directory: %s (%s)",
-                            val, e.what()
-                        );
-                    }
-                    break;
-                case 'f':
-                    deffile = val;
-                    break;
-                case 'e':
-                    fcont = val;
-                    break;
-                case 'j': {
-                    int ival = atoi(val.data());
-                    if (!ival) {
-                        ival = ncpus;
-                    }
-                    jobs = std::max(1, ival);
-                    break;
-                }
-                default:
-                    return os.print_help(true, deffile);
-            }
-        } else {
-            posarg = i;
-            break;
-        }
+    auto &help = ap.add_optional("-h", "--help", 0)
+        .help("print this message and exit")
+        .action(ostd::arg_print_help(ap));
+
+    int jobs = 1;
+    ap.add_optional("-j", "--jobs", 1)
+        .help("specify the number of jobs to use (default: 1)")
+        .action(ostd::arg_store_format("%d", jobs));
+
+    std::string curdir;
+    ap.add_optional("-C", "--change-directory", 1)
+        .help("change to DIRECTORY before running")
+        .metavar("DIRECTORY")
+        .action([&curdir, &os](auto vals) {
+            curdir = std::string{vals[0]};
+            fs::current_path(curdir);
+        });
+
+    std::string deffile = "obuild.cfg";
+    ap.add_optional("-f", "--file", 1)
+        .help("specify the file to run (default: obuild.cfg)")
+        .action(ostd::arg_store_str(deffile));
+
+    std::string fcont;
+    ap.add_optional("-e", "--execute", 1)
+        .help("evaluate a string instead of a file")
+        .metavar("STR")
+        .action(ostd::arg_store_str(fcont));
+
+    ap.add_optional("-E", "--ignore-env", 0)
+        .help("ignore environment variables")
+        .action(ostd::arg_store_true(os.ignore_env));
+
+    std::string action = "default";
+    ap.add_positional("action", ostd::arg_value::OPTIONAL)
+        .help("the action to perform")
+        .action(ostd::arg_store_str(action));
+
+    try {
+        ap.parse(argc, argv);
+    } catch (ostd::arg_error const &e) {
+        ostd::cerr.writefln("failed parsing arguments: %s", e.what());
+        ap.print_help(ostd::cerr.iter());
+        return 1;
+    } catch (fs::filesystem_error const &e) {
+        return os.error(
+            1, "failed changing directory: %s (%s)", curdir, e.what()
+        );
     }
+
+    if (help.used()) {
+        return 0;
+    }
+
+    if (!jobs) {
+        jobs = ncpus;
+    }
+    jobs = std::max(1, jobs);
+
     os.new_ivar("numjobs", 4096, 1, jobs);
 
     ostd::thread_pool tpool;
@@ -732,5 +732,5 @@ int main(int argc, char **argv) {
         return os.error(1, "no targets");
     }
 
-    return os.exec_main((posarg < argc) ? argv[posarg] : "default");
+    return os.exec_main(action);
 }

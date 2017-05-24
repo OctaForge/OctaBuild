@@ -601,10 +601,7 @@ int main(int argc, char **argv) {
     ap.add_optional("-C", "--change-directory", 1)
         .help("change to DIRECTORY before running")
         .metavar("DIRECTORY")
-        .action([&curdir, &os](auto vals) {
-            curdir = std::string{vals[0]};
-            fs::current_path(curdir);
-        });
+        .action(ostd::arg_store_str(curdir));
 
     std::string deffile = "obuild.cfg";
     ap.add_optional("-f", "--file", 1)
@@ -632,10 +629,6 @@ int main(int argc, char **argv) {
         ostd::cerr.writefln("failed parsing arguments: %s", e.what());
         ap.print_help(ostd::cerr.iter());
         return 1;
-    } catch (fs::filesystem_error const &e) {
-        return os.error(
-            1, "failed changing directory: %s (%s)", curdir, e.what()
-        );
     }
 
     if (help.used()) {
@@ -646,6 +639,16 @@ int main(int argc, char **argv) {
         jobs = ncpus;
     }
     jobs = std::max(1, jobs);
+
+    try {
+        if (!curdir.empty()) {
+            fs::current_path(curdir);
+        }
+    } catch (fs::filesystem_error const &e) {
+        return os.error(
+            1, "failed changing directory: %s (%s)", curdir, e.what()
+        );
+    }
 
     os.new_ivar("numjobs", 4096, 1, jobs);
 

@@ -13,9 +13,9 @@ library form will be introduced.
 
 It needs libcubescript to function, which you can fetch at
 https://git.octaforge.org/tools/libcubescript.git or at
-https://github.com/OctaForge/libcubescript as well as OctaSTD
-at https://git.octaforge.org/tools/octastd.git or at
-https://github.com/OctaForge/OctaSTD.
+https://github.com/OctaForge/libcubescript as well as libostd
+at https://git.octaforge.org/tools/libostd.git or at
+https://github.com/OctaForge/libostd.
 
 ## Features
 

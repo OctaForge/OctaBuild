@@ -1,10 +1,10 @@
 #include <utility>
 #include <thread>
-#include <mutex>
-#include <condition_variable>
-#include <atomic>
 #include <unordered_map>
 #include <vector>
+#include <stack>
+#include <queue>
+#include <future>
 
 #include <ostd/string.hh>
 #include <ostd/format.hh>
@@ -294,51 +294,26 @@ struct ob_state: cs_state {
 
     std::unordered_map<string_range, std::vector<SubRule>> cache;
 
-    struct RuleCounter {
-        RuleCounter(): p_cond(), p_mtx(), p_counter(0), p_result(0) {}
-
-        void wait() {
-            std::unique_lock<std::mutex> l(p_mtx);
-            while (p_counter) {
-                p_cond.wait(l);
-            }
-        }
-
-        void incr() {
-            std::unique_lock<std::mutex> l(p_mtx);
-            ++p_counter;
-        }
-
-        void decr() {
-            std::unique_lock<std::mutex> l(p_mtx);
-            if (!--p_counter) {
-                l.unlock();
-                p_cond.notify_all();
-            }
-        }
-
-        std::atomic_int &get_result() { return p_result; }
-
-    private:
-        std::condition_variable p_cond;
-        std::mutex p_mtx;
-        int p_counter;
-        std::atomic_int p_result;
-    };
-
-    std::vector<RuleCounter *> counters;
+    std::stack<std::queue<std::future<int>> *> waiting;
 
     template<typename F>
     int wait_result(F func) {
-        RuleCounter ctr;
-        counters.push_back(&ctr);
+        std::queue<std::future<int>> waits;
+        waiting.push(&waits);
         int ret = func();
-        counters.pop_back();
+        waiting.pop();
         if (ret) {
             return ret;
         }
-        ctr.wait();
-        return ctr.get_result();
+        while (!waits.empty()) {
+            auto &t = waits.front();
+            if (int tr = t.get(); tr) {
+                /* TODO: wait for unfinished tasks */
+                return tr;
+            }
+            waits.pop();
+        }
+        return 0;
     }
 
     template<typename ...A>
@@ -662,15 +637,11 @@ int main(int argc, char **argv) {
     });
 
     os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &res) {
-        auto cnt = os.counters.back();
-        cnt->incr();
-        tpool.push([cnt, ds = std::string(args[0].get_strr())]() {
-            int ret = system(ds.data());
-            if (ret && !cnt->get_result()) {
-                cnt->get_result() = ret;
-            }
-            cnt->decr();
-        });
+        os.waiting.top()->push(tpool.push([
+            ds = std::string(args[0].get_strr())
+        ]() {
+            return system(ds.data());
+        }));
         res.set_int(0);
     });
 

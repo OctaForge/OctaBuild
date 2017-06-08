@@ -5,6 +5,7 @@
 #include <stack>
 #include <queue>
 #include <future>
+#include <stdexcept>
 
 #include <ostd/string.hh>
 #include <ostd/format.hh>
@@ -27,6 +28,17 @@ using cscript::cs_bcode_ref;
 using cscript::cs_bcode;
 
 namespace fs = ostd::filesystem;
+
+struct build_error: std::runtime_error {
+    using std::runtime_error::runtime_error;
+
+    template<typename ...A>
+    build_error(string_range fmt, A const &...args):
+        build_error(
+            ostd::format(ostd::appender<std::string>(), fmt, args...).get()
+        )
+    {}
+};
 
 /* glob matching code */
 
@@ -269,7 +281,6 @@ static string_range ob_compare_subst(
 }
 
 struct ob_state: cs_state {
-    string_range progname;
     bool ignore_env = false;
 
     /* represents a rule definition, possibly with a function */
@@ -294,36 +305,27 @@ struct ob_state: cs_state {
 
     std::unordered_map<string_range, std::vector<SubRule>> cache;
 
-    std::stack<std::queue<std::future<int>> *> waiting;
+    std::stack<std::queue<std::future<void>> *> waiting;
 
     template<typename F>
-    int wait_result(F func) {
-        std::queue<std::future<int>> waits;
+    void wait_result(F func) {
+        std::queue<std::future<void>> waits;
         waiting.push(&waits);
-        int ret = func();
-        waiting.pop();
-        if (ret) {
-            return ret;
+        try {
+            func();
+        } catch (...) {
+            waiting.pop();
+            throw;
         }
+        waiting.pop();
         while (!waits.empty()) {
-            auto &t = waits.front();
-            if (int tr = t.get(); tr) {
-                /* TODO: wait for unfinished tasks */
-                return tr;
-            }
+            /* TODO: wait for unfinished tasks */
+            waits.front().get();
             waits.pop();
         }
-        return 0;
     }
 
-    template<typename ...A>
-    int error(int retcode, string_range fmt, A &&...args) {
-        ostd::cerr.write(progname, ": ");
-        ostd::cerr.writefln(fmt, std::forward<A>(args)...);
-        return retcode;
-    }
-
-    int exec_list(
+    void exec_list(
         std::vector<SubRule> const &rlist, std::vector<std::string> &subdeps,
         string_range tname
     ) {
@@ -343,19 +345,15 @@ struct ob_state: cs_state {
                     atgt = ostd::iter(repd);
                 }
                 subdeps.push_back(std::string{atgt});
-                int r = exec_rule(atgt, tname);
-                if (r) {
-                    return r;
-                }
+                exec_rule(atgt, tname);
             }
         }
-        return 0;
     }
 
-    int exec_func(string_range tname, std::vector<SubRule> const &rlist) {
+    void exec_func(string_range tname, std::vector<SubRule> const &rlist) {
         std::vector<std::string> subdeps;
-        int ret = wait_result([&rlist, &subdeps, &tname, this]() {
-            return exec_list(rlist, subdeps, tname);
+        wait_result([&rlist, &subdeps, &tname, this]() {
+            exec_list(rlist, subdeps, tname);
         });
         cs_bcode_ref *func = nullptr;
         bool act = false;
@@ -366,21 +364,27 @@ struct ob_state: cs_state {
                 break;
             }
         }
-        if ((!ret && (act || ob_check_exec(tname, subdeps))) && func) {
+        if ((act || ob_check_exec(tname, subdeps)) && func) {
             cs_stacked_value targetv, sourcev, sourcesv;
 
             if (!targetv.set_alias(new_ident("target"))) {
-                return 1;
+                throw build_error{
+                    "internal error: could not set alias 'target'"
+                };
             }
             targetv.set_cstr(tname);
             targetv.push();
 
             if (!subdeps.empty()) {
                 if (!sourcev.set_alias(new_ident("source"))) {
-                    return 1;
+                    throw build_error{
+                        "internal error: could not set alias 'source'"
+                    };
                 }
                 if (!sourcesv.set_alias(new_ident("sources"))) {
-                    return 1;
+                    throw build_error{
+                        "internal error: could not set alias 'sources'"
+                    };
                 }
 
                 sourcev.set_cstr(subdeps[0]);
@@ -392,18 +396,25 @@ struct ob_state: cs_state {
                 sourcesv.push();
             }
 
-            return run_int(*func);
+            try {
+                run(*func);
+            } catch (cscript::cs_error const &e) {
+                throw build_error{e.what()};
+            }
         }
-        return ret;
     }
 
-    int exec_action(Rule *rule) {
-        return run_int(rule->func);
+    void exec_action(Rule *rule) {
+        try {
+            run(rule->func);
+        } catch (cscript::cs_error const &e) {
+            throw build_error{e.what()};
+        }
     }
 
-    int find_rules(string_range target, std::vector<SubRule> &rlist) {
+    void find_rules(string_range target, std::vector<SubRule> &rlist) {
         if (!rlist.empty()) {
-            return 0;
+            return;
         }
         SubRule *frule = nullptr;
         bool exact = false;
@@ -413,7 +424,7 @@ struct ob_state: cs_state {
                 rlist.back().rule = &rule;
                 if (rule.func) {
                     if (frule && exact) {
-                        return error(1, "redefinition of rule '%s'", target);
+                        throw build_error{"redefinition of rule '%s'", target};
                     }
                     if (!frule) {
                         frule = &rlist.back();
@@ -436,7 +447,7 @@ struct ob_state: cs_state {
                 sr.sub = sub;
                 if (frule) {
                     if (sub.size() == frule->sub.size()) {
-                        return error(1, "redefinition of rule '%s'", target);
+                        throw build_error{"redefinition of rule '%s'", target};
                     }
                     if (sub.size() < frule->sub.size()) {
                         *frule = sr;
@@ -447,34 +458,29 @@ struct ob_state: cs_state {
                 }
             }
         }
-        return 0;
     }
 
-    int exec_rule(string_range target, string_range from = nullptr) {
+    void exec_rule(string_range target, string_range from = nullptr) {
         std::vector<SubRule> &rlist = cache[target];
-        int fret = find_rules(target, rlist);
-        if (fret) {
-            return fret;
-        }
+        find_rules(target, rlist);
         if ((rlist.size() == 1) && rlist[0].rule->action) {
-            return exec_action(rlist[0].rule);
+            exec_action(rlist[0].rule);
+            return;
         }
         if (rlist.empty() && !ob_check_file(target)) {
             if (from.empty()) {
-                return error(1, "no rule to run target '%s'", target);
+                throw build_error{"no rule to run target '%s'", target};
             } else {
-                return error(
-                    1, "no rule to run target '%s' (needed by '%s')",
-                    target, from
-                );
+                throw build_error{
+                    "no rule to run target '%s' (needed by '%s')", target, from
+                };
             }
-            return 1;
         }
-        return exec_func(target, rlist);
+        exec_func(target, rlist);
     }
 
-    int exec_main(string_range target) {
-        return wait_result([&target, this]() { return exec_rule(target); });
+    void exec_main(string_range target) {
+        wait_result([&target, this]() { exec_rule(target); });
     }
 
     void rule_add(
@@ -550,18 +556,14 @@ struct ob_state: cs_state {
     }
 };
 
-int main(int argc, char **argv) {
+void do_main(int argc, char **argv) {
     ob_state os;
-    string_range pn = argv[0];
-    string_range lslash = ostd::find_last(pn, '/');
-    os.progname = lslash.empty() ? pn : lslash.slice(1, lslash.size());
-
     os.init_libs();
 
     int ncpus = std::thread::hardware_concurrency();
     os.new_ivar("numcpus", 4096, 1, ncpus);
 
-    ostd::arg_parser ap{pn};
+    ostd::arg_parser ap;
 
     auto &help = ap.add_optional("-h", "--help", 0)
         .help("print this message and exit")
@@ -603,11 +605,11 @@ int main(int argc, char **argv) {
     } catch (ostd::arg_error const &e) {
         ostd::cerr.writefln("failed parsing arguments: %s", e.what());
         ap.print_help(ostd::cerr.iter());
-        return 1;
+        throw build_error{""};
     }
 
     if (help.used()) {
-        return 0;
+        return;
     }
 
     if (!jobs) {
@@ -620,9 +622,9 @@ int main(int argc, char **argv) {
             fs::current_path(curdir);
         }
     } catch (fs::filesystem_error const &e) {
-        return os.error(
-            1, "failed changing directory: %s (%s)", curdir, e.what()
-        );
+        throw build_error{
+            "failed changing directory: %s (0s)", curdir, e.what()
+        };
     }
 
     os.new_ivar("numjobs", 4096, 1, jobs);
@@ -636,13 +638,14 @@ int main(int argc, char **argv) {
         writeln(args[0].get_strr());
     });
 
-    os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &res) {
+    os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &) {
         os.waiting.top()->push(tpool.push([
             ds = std::string(args[0].get_strr())
         ]() {
-            return system(ds.data());
+            if (system(ds.data())) {
+                throw build_error{""};
+            }
         }));
-        res.set_int(0);
     });
 
     os.new_command("getenv", "ss", [&os](auto &, auto args, auto &res) {
@@ -685,8 +688,8 @@ int main(int argc, char **argv) {
         res.set_str(std::move(ret));
     });
 
-    os.new_command("invoke", "s", [&os](auto &, auto args, auto &res) {
-        res.set_int(os.exec_main(args[0].get_strr()));
+    os.new_command("invoke", "s", [&os](auto &, auto args, auto &) {
+        os.exec_main(args[0].get_strr());
     });
 
     os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
@@ -699,12 +702,25 @@ int main(int argc, char **argv) {
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {
-        return os.error(1, "failed creating rules");
+        throw build_error{"failed creating rules"};
     }
 
     if (os.rules.empty()) {
-        return os.error(1, "no targets");
+        throw build_error{"no targets"};
     }
 
-    return os.exec_main(action);
+    os.exec_main(action);
+}
+
+int main(int argc, char **argv) {
+    try {
+        do_main(argc, argv);
+    } catch (build_error const &e) {
+        auto s = e.what();
+        if (s[0]) {
+            ostd::cerr.writefln("%s: %s", argv[0], s);
+        }
+        return 1;
+    }
+    return 0;
 }

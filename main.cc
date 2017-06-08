@@ -305,6 +305,7 @@ struct ob_state: cs_state {
 
     std::unordered_map<string_range, std::vector<SubRule>> cache;
 
+    ostd::thread_pool tpool;
     std::stack<std::queue<std::future<void>> *> waiting;
 
     template<typename F>
@@ -323,6 +324,11 @@ struct ob_state: cs_state {
             waits.front().get();
             waits.pop();
         }
+    }
+
+    template<typename F>
+    void push_task(F &&func) {
+        waiting.top()->push(tpool.push(std::forward<F>(func)));
     }
 
     void exec_list(
@@ -629,8 +635,7 @@ void do_main(int argc, char **argv) {
 
     os.new_ivar("numjobs", 4096, 1, jobs);
 
-    ostd::thread_pool tpool;
-    tpool.start(jobs);
+    os.tpool.start(jobs);
 
     os.register_rulecmds();
 
@@ -638,14 +643,12 @@ void do_main(int argc, char **argv) {
         writeln(args[0].get_strr());
     });
 
-    os.new_command("shell", "C", [&os, &tpool](auto &, auto args, auto &) {
-        os.waiting.top()->push(tpool.push([
-            ds = std::string(args[0].get_strr())
-        ]() {
+    os.new_command("shell", "C", [&os](auto &, auto args, auto &) {
+        os.push_task([ds = std::string(args[0].get_strr())]() {
             if (system(ds.data())) {
                 throw build_error{""};
             }
-        }));
+        });
     });
 
     os.new_command("getenv", "ss", [&os](auto &, auto args, auto &res) {

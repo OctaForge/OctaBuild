@@ -40,164 +40,6 @@ struct build_error: std::runtime_error {
     {}
 };
 
-/* glob matching code */
-
-static void ob_get_path_parts(
-    std::vector<string_range> &parts, string_range elem
-) {
-    string_range star = ostd::find(elem, '*');
-    while (!star.empty()) {
-        string_range ep = elem.slice(0, &star[0] - &elem[0]);
-        if (!ep.empty()) {
-            parts.push_back(ep);
-        }
-        parts.push_back("*");
-        elem = star;
-        ++elem;
-        star = ostd::find(elem, '*');
-    }
-    if (!elem.empty()) {
-        parts.push_back(elem);
-    }
-}
-
-static bool ob_path_matches(
-    string_range fn, std::vector<string_range> const &parts
-) {
-    for (auto it = ostd::iter(parts); !it.empty(); ++it) {
-        string_range elem = it.front();
-        if (elem == "*") {
-            ++it;
-            /* skip multiple stars if present */
-            while (!it.empty() && ((elem = it.front()) == "*")) {
-                ++it;
-            }
-            /* trailing stars, we match */
-            if (it.empty()) {
-                return true;
-            }
-            /* skip about as much as we can until the elem part matches */
-            while (fn.size() > elem.size()) {
-                if (fn.slice(0, elem.size()) == elem) {
-                    break;
-                }
-                ++fn;
-            }
-        }
-        /* non-star here */
-        if (fn.size() < elem.size()) {
-            return false;
-        }
-        if (fn.slice(0, elem.size()) != elem) {
-            return false;
-        }
-        fn = fn.slice(elem.size(), fn.size());
-    }
-    /* if there are no chars in the fname remaining, we fully matched */
-    return fn.empty();
-}
-
-static bool ob_expand_glob(
-    std::string &ret, string_range src, bool ne = false
-);
-
-static bool ob_expand_dir(
-    std::string &ret, string_range dir,
-    std::vector<string_range> const &parts, string_range slash
-) {
-    fs::directory_iterator d;
-    try {
-        d = fs::directory_iterator{std::string{dir}};
-    } catch (fs::filesystem_error const &) {
-        return false;
-    }
-    bool appended = false;
-    for (auto &fi: d) {
-        std::string fn = fs::path{fi}.filename().string();
-        /* check if filename matches */
-        if (!ob_path_matches(fn, parts)) {
-            continue;
-        }
-        std::string afn((dir == ".") ? "" : "./");
-        afn.append(fn);
-        /* if we reach this, we match; try recursively matching */
-        if (!slash.empty()) {
-            afn.append(slash);
-            string_range psl = slash.slice(1, slash.size());
-            if (!ostd::find(psl, '*').empty()) {
-                if (!appended) {
-                    appended = ob_expand_glob(ret, ostd::iter(afn));
-                }
-                continue;
-            }
-            /* no further star, just do file test */
-            if (!ostd::file_stream{afn, ostd::stream_mode::READ}.is_open()) {
-                continue;
-            }
-            if (!ret.empty()) {
-                ret.push_back(' ');
-            }
-            ret.append(afn);
-            appended = true;
-            continue;
-        }
-        if (!ret.empty()) {
-            ret.push_back(' ');
-        }
-        ret.append(afn);
-        appended = true;
-    }
-    return appended;
-}
-
-static bool ob_expand_glob(std::string &ret, string_range src, bool ne) {
-    string_range star = ostd::find(src, '*');
-    /* no star use as-is */
-    if (star.empty()) {
-        if (ne) return false;
-        if (!ret.empty()) {
-            ret.push_back(' ');
-        }
-        ret.append(src);
-        return false;
-    }
-    /* part before star */
-    string_range prestar = src.slice(0, &star[0] - &src[0]);
-    /* try finding slash before star */
-    string_range slash = ostd::find_last(prestar, '/');
-    /* directory to scan */
-    string_range dir = ".";
-    /* part of name before star */
-    string_range fnpre = prestar;
-    if (!slash.empty()) {
-        /* there was slash, adjust directory + prefix accordingly */
-        dir = src.slice(0, &slash[0] - &src[0]);
-        fnpre = slash.slice(1, slash.size());
-    }
-    /* part after star */
-    string_range fnpost = star.slice(1, star.size());
-    /* if a slash follows, adjust */
-    string_range nslash = ostd::find(fnpost, '/');
-    if (!nslash.empty()) {
-        fnpost = fnpost.slice(0, &nslash[0] - &fnpost[0]);
-    }
-    /* retrieve the single element with whatever stars in it, chop it up */
-    std::vector<string_range> parts;
-    ob_get_path_parts(parts, string_range(&fnpre[0], &fnpost[fnpost.size()]));
-    /* do a directory scan and match */
-    if (!ob_expand_dir(ret, dir, parts, nslash)) {
-        if (ne) {
-            return false;
-        }
-        if (!ret.empty()) {
-            ret.push_back(' ');
-        }
-        ret.append(src);
-        return false;
-    }
-    return true;
-}
-
 /* check funcs */
 
 static bool ob_check_ts(
@@ -696,12 +538,14 @@ void do_main(int argc, char **argv) {
     });
 
     os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
-        std::string ret;
+        auto ret = ostd::appender<std::string>();
+        auto app = ostd::appender<std::vector<fs::path>>();
         cscript::util::ListParser p{cs, args[0].get_strr()};
         while (p.parse()) {
-            ob_expand_glob(ret, p.get_item());
+            ostd::glob_match(app, p.get_item());
         }
-        res.set_str(std::move(ret));
+        ostd::format(ret, "%(%s %)", app.get());
+        res.set_str(std::move(ret.get()));
     });
 
     if ((!fcont.empty() && !os.run_bool(fcont)) || !os.run_file(deffile)) {

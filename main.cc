@@ -65,18 +65,14 @@ static bool ob_check_ts(
     return false;
 }
 
-static bool ob_check_file(string_range fname) {
-    return ostd::file_stream{fname, ostd::stream_mode::READ}.is_open();
-}
-
 static bool ob_check_exec(
     string_range tname, std::vector<std::string> const &deps
 ) {
-    if (!ob_check_file(tname)) {
+    if (!fs::exists(std::string{tname})) {
         return true;
     }
     for (auto &dep: deps) {
-        if (!ob_check_file(dep)) {
+        if (!fs::exists(dep)) {
             return true;
         }
     }
@@ -315,7 +311,7 @@ struct ob_state: cs_state {
             exec_action(rlist[0].rule);
             return;
         }
-        if (rlist.empty() && !ob_check_file(target)) {
+        if (rlist.empty() && !fs::exists(std::string{target})) {
             if (from.empty()) {
                 throw build_error{"no rule to run target '%s'", target};
             } else {

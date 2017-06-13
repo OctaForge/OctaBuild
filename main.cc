@@ -157,10 +157,20 @@ struct ob_state: cs_state {
             throw;
         }
         waiting.pop();
-        while (!waits.empty()) {
-            /* TODO: wait for unfinished tasks */
-            waits.front().get();
-            waits.pop();
+        for (; !waits.empty(); waits.pop()) {
+            try {
+                waits.front().get();
+            } catch (build_error const &) {
+                waits.pop();
+                for (; !waits.empty(); waits.pop()) {
+                    try {
+                        waits.front().get();
+                    } catch (build_error const &) {
+                        /* no rethrow */
+                    }
+                }
+                throw;
+            }
         }
     }
 

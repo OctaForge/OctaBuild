@@ -457,7 +457,7 @@ void do_main(int argc, char **argv) {
     try {
         ap.parse(argc, argv);
     } catch (ostd::arg_error const &e) {
-        ostd::cerr.writefln("failed parsing arguments: %s", e.what());
+        ostd::cerr.writefln("%s: %s", argv[0], e.what());
         ap.print_help(ostd::cerr.iter());
         throw build_error{""};
     }

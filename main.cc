@@ -162,6 +162,7 @@ struct ob_state: cs_state {
                 waits.front().get();
             } catch (build_error const &) {
                 waits.pop();
+                ostd::writeln("waiting for the remaining tasks to finish...");
                 for (; !waits.empty(); waits.pop()) {
                     try {
                         waits.front().get();

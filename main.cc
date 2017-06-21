@@ -42,9 +42,17 @@ struct build_error: std::runtime_error {
 
 /* check funcs */
 
-static bool ob_check_ts(
+static bool ob_check_exec(
     string_range tname, std::vector<std::string> const &deps
 ) {
+    if (!fs::exists(std::string{tname})) {
+        return true;
+    }
+    for (auto &dep: deps) {
+        if (!fs::exists(dep)) {
+            return true;
+        }
+    }
     auto get_ts = [](string_range fname) {
         fs::path p{std::string{fname}};
         if (!fs::is_regular_file(p)) {
@@ -63,20 +71,6 @@ static bool ob_check_ts(
         }
     }
     return false;
-}
-
-static bool ob_check_exec(
-    string_range tname, std::vector<std::string> const &deps
-) {
-    if (!fs::exists(std::string{tname})) {
-        return true;
-    }
-    for (auto &dep: deps) {
-        if (!fs::exists(dep)) {
-            return true;
-        }
-    }
-    return ob_check_ts(tname, deps);
 }
 
 /* this lets us properly match % patterns in target names */

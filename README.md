@@ -9,7 +9,8 @@ into a thread pool. Therefore, things such as standard output are unaffected
 by threading.
 
 It can be used standalone at this point. Once everything is more done, a
-library form will be introduced.
+library form will be introduced. Several of the features are currently
+present via libostd (such as glob matching).
 
 It needs libcubescript to function, which you can fetch at
 https://git.octaforge.org/tools/libcubescript.git or at

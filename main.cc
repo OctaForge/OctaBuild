@@ -9,7 +9,7 @@
 
 #include <ostd/string.hh>
 #include <ostd/format.hh>
-#include <ostd/filesystem.hh>
+#include <ostd/path.hh>
 #include <ostd/io.hh>
 #include <ostd/platform.hh>
 #include <ostd/environ.hh>
@@ -19,6 +19,7 @@
 #include <cubescript/cubescript.hh>
 
 using ostd::string_range;
+using ostd::path;
 
 using cscript::cs_state;
 using cscript::cs_value_r;
@@ -27,7 +28,7 @@ using cscript::cs_stacked_value;
 using cscript::cs_bcode_ref;
 using cscript::cs_bcode;
 
-namespace fs = ostd::filesystem;
+namespace fs = ostd::fs;
 
 struct build_error: std::runtime_error {
     using std::runtime_error::runtime_error;
@@ -45,7 +46,7 @@ struct build_error: std::runtime_error {
 static bool ob_check_exec(
     string_range tname, std::vector<std::string> const &deps
 ) {
-    if (!fs::exists(std::string{tname})) {
+    if (!fs::exists(tname)) {
         return true;
     }
     for (auto &dep: deps) {
@@ -54,19 +55,19 @@ static bool ob_check_exec(
         }
     }
     auto get_ts = [](string_range fname) {
-        fs::path p{std::string{fname}};
+        path p{fname};
         if (!fs::is_regular_file(p)) {
-            return fs::file_time_type{};
+            return fs::file_time_t{};
         }
         return fs::last_write_time(p);
     };
     auto tts = get_ts(tname);
-    if (tts == fs::file_time_type{}) {
+    if (tts == fs::file_time_t{}) {
         return true;
     }
     for (auto &dep: deps) {
         auto sts = get_ts(dep);
-        if ((sts != fs::file_time_type{}) && (tts < sts)) {
+        if ((sts != fs::file_time_t{}) && (tts < sts)) {
             return true;
         }
     }
@@ -316,7 +317,7 @@ struct ob_state: cs_state {
             exec_action(rlist[0].rule);
             return;
         }
-        if (rlist.empty() && !fs::exists(std::string{target})) {
+        if (rlist.empty() && !fs::exists(target)) {
             if (from.empty()) {
                 throw build_error{"no rule to run target '%s'", target};
             } else {
@@ -470,7 +471,7 @@ void do_main(int argc, char **argv) {
         if (!curdir.empty()) {
             fs::current_path(curdir);
         }
-    } catch (fs::filesystem_error const &e) {
+    } catch (fs::fs_error const &e) {
         throw build_error{
             "failed changing directory: %s (0s)", curdir, e.what()
         };
@@ -538,12 +539,12 @@ void do_main(int argc, char **argv) {
         os.exec_main(args[0].get_strr());
     });
 
-    os.new_command("glob", "C", [&os](auto &cs, auto args, auto &res) {
+    os.new_command("glob", "C", [](auto &cs, auto args, auto &res) {
         auto ret = ostd::appender<std::string>();
-        auto app = ostd::appender<std::vector<fs::path>>();
+        auto app = ostd::appender<std::vector<path>>();
         cscript::util::ListParser p{cs, args[0].get_strr()};
         while (p.parse()) {
-            ostd::glob_match(app, p.get_item());
+            fs::glob_match(app, p.get_item());
         }
         ostd::format(ret, "%(%s %)", app.get());
         res.set_str(std::move(ret.get()));

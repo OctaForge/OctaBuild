@@ -202,9 +202,11 @@ struct ob_state: cs_state {
 
     void exec_func(string_range tname, std::vector<SubRule> const &rlist) {
         std::vector<std::string> subdeps;
-        wait_result([&rlist, &subdeps, &tname, this]() {
-            exec_list(rlist, subdeps, tname);
-        });
+        if ((rlist.size() > 1) || !rlist[0].rule->deps.empty()) {
+            wait_result([&rlist, &subdeps, &tname, this]() {
+                exec_list(rlist, subdeps, tname);
+            });
+        }
         cs_bcode_ref *func = nullptr;
         bool act = false;
         for (auto &sr: rlist) {
@@ -251,14 +253,6 @@ struct ob_state: cs_state {
             } catch (cscript::cs_error const &e) {
                 throw build_error{e.what()};
             }
-        }
-    }
-
-    void exec_action(Rule *rule) {
-        try {
-            run(rule->func);
-        } catch (cscript::cs_error const &e) {
-            throw build_error{e.what()};
         }
     }
 
@@ -313,10 +307,6 @@ struct ob_state: cs_state {
     void exec_rule(string_range target, string_range from = nullptr) {
         std::vector<SubRule> &rlist = cache[target];
         find_rules(target, rlist);
-        if ((rlist.size() == 1) && rlist[0].rule->action) {
-            exec_action(rlist[0].rule);
-            return;
-        }
         if (rlist.empty() && !fs::exists(target)) {
             if (from.empty()) {
                 throw build_error{"no rule to run target '%s'", target};

@@ -131,40 +131,25 @@ static void init_baselib(cs_state &cs, build::make &mk, bool ignore_env) {
 
 static void init_pathlib(cs_state &cs) {
     cs.new_command("extreplace", "sss", [](auto &cs, auto args, auto &res) {
-        string_range lst = args[0].get_strr();
         string_range oldext = args[1].get_strr();
         string_range newext = args[2].get_strr();
         std::string ret;
-        if (oldext.front() == '.') {
-            oldext.pop_front();
-        }
-        if (newext.front() == '.') {
-            newext.pop_front();
-        }
-        cscript::util::ListParser p{cs, lst};
-        while (p.parse()) {
-            auto elem = p.get_item();
-            string_range it = ostd::iter(elem);
+        for (cscript::util::ListParser p{cs, args[0].get_strr()}; p.parse();) {
+            ostd::path np{p.get_item()};
             if (!ret.empty()) {
                 ret += ' ';
             }
-            auto dot = ostd::find_last(it, '.');
-            if (!dot.empty() && (dot.slice(1, dot.size()) == oldext)) {
-                ret += it.slice(0, &dot[0] - &it[0]);
-                ret += '.';
-                ret += newext;
-            } else {
-                ret += it;
-            }
+            ret += (
+                (np.suffixes() == oldext) ? np.with_suffixes(newext) : np
+            ).string();
         }
         res.set_str(std::move(ret));
     });
 
     cs.new_command("glob", "C", [](auto &cs, auto args, auto &res) {
         auto ret = ostd::appender<std::string>();
-        auto app = ostd::appender<std::vector<path>>();
-        cscript::util::ListParser p{cs, args[0].get_strr()};
-        while (p.parse()) {
+        auto app = ostd::appender<std::vector<path>>();;
+        for (cscript::util::ListParser p{cs, args[0].get_strr()}; p.parse();) {
             fs::glob_match(app, p.get_item());
         }
         ostd::format(ret, "%(%s %)", app.get());

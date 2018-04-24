@@ -32,10 +32,10 @@ static void rule_add(
     string_range target, string_range depends,
     cs_bcode *body, bool action = false
 ) {
-    cscript::util::ListParser p{cs, target};
+    cscript::util::list_parser p{cs, target};
     while (p.parse()) {
         auto &rl = mk.rule(p.get_item()).action(action);
-        cscript::util::ListParser lp{cs, depends};
+        cscript::util::list_parser lp{cs, depends};
         while (lp.parse()) {
             rl.depend(lp.get_item());
         }
@@ -134,7 +134,7 @@ static void init_pathlib(cs_state &cs) {
         string_range oldext = args[1].get_strr();
         string_range newext = args[2].get_strr();
         std::string ret;
-        for (cscript::util::ListParser p{cs, args[0].get_strr()}; p.parse();) {
+        for (cscript::util::list_parser p{cs, args[0].get_strr()}; p.parse();) {
             ostd::path np{p.get_item()};
             if (!ret.empty()) {
                 ret += ' ';
@@ -149,7 +149,7 @@ static void init_pathlib(cs_state &cs) {
     cs.new_command("glob", "C", [](auto &cs, auto args, auto &res) {
         auto ret = ostd::appender<std::string>();
         auto app = ostd::appender<std::vector<path>>();;
-        for (cscript::util::ListParser p{cs, args[0].get_strr()}; p.parse();) {
+        for (cscript::util::list_parser p{cs, args[0].get_strr()}; p.parse();) {
             fs::glob_match(app, p.get_item());
         }
         ostd::format(ret, "%(%s %)", app.get());

@@ -33,17 +33,9 @@ static void rule_add(
     string_range target, string_range depends,
     cs_bcode *body, bool action = false
 ) {
-    list_parser p{cs, target};
-    for (auto tr: p.iter()) {
-        auto &rl = mk.rule(tr).action(action);
-        list_parser lp{cs, depends};
-        for (auto dp: lp.iter()) {
-            rl.depend(dp);
-        }
-        if (cscript::cs_code_is_empty(body)) {
-            continue;
-        }
-        rl.body([body = cs_bcode_ref(body), &cs](auto tgt, auto srcs) {
+    build::make_rule::body_func bodyf{};
+    if (!cscript::cs_code_is_empty(body)) {
+        bodyf = [body = cs_bcode_ref(body), &cs](auto tgt, auto srcs) {
             cs_stacked_value targetv, sourcev, sourcesv;
 
             if (!targetv.set_alias(cs.new_ident("target"))) {
@@ -80,7 +72,12 @@ static void rule_add(
             } catch (cscript::cs_error const &e) {
                 throw build::make_error{e.what()};
             }
-        });
+        };
+    }
+    list_parser p{cs, target};
+    for (auto tr: p.iter()) {
+        list_parser lp{cs, depends};
+        mk.rule(tr).action(action).body(bodyf).depend(lp.iter());
     }
 }
 

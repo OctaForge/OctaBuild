@@ -23,6 +23,7 @@ using cscript::cs_value;
 using cscript::cs_stacked_value;
 using cscript::cs_bcode_ref;
 using cscript::cs_bcode;
+using cscript::util::list_parser;
 
 namespace fs = ostd::fs;
 namespace build = ostd::build;
@@ -32,12 +33,12 @@ static void rule_add(
     string_range target, string_range depends,
     cs_bcode *body, bool action = false
 ) {
-    cscript::util::list_parser p{cs, target};
-    while (p.parse()) {
-        auto &rl = mk.rule(p.get_item()).action(action);
-        cscript::util::list_parser lp{cs, depends};
-        while (lp.parse()) {
-            rl.depend(lp.get_item());
+    list_parser p{cs, target};
+    for (auto tr: p.iter()) {
+        auto &rl = mk.rule(tr).action(action);
+        list_parser lp{cs, depends};
+        for (auto dp: lp.iter()) {
+            rl.depend(dp);
         }
         if (cscript::cs_code_is_empty(body)) {
             continue;
@@ -134,8 +135,9 @@ static void init_pathlib(cs_state &cs) {
         string_range oldext = args[1].get_strr();
         string_range newext = args[2].get_strr();
         std::string ret;
-        for (cscript::util::list_parser p{cs, args[0].get_strr()}; p.parse();) {
-            ostd::path np{p.get_item()};
+        list_parser p{cs, args[0].get_strr()};
+        for (auto ps: p.iter()) {
+            ostd::path np{ps};
             if (!ret.empty()) {
                 ret += ' ';
             }
@@ -147,13 +149,14 @@ static void init_pathlib(cs_state &cs) {
     });
 
     cs.new_command("glob", "C", [](auto &cs, auto args, auto &res) {
-        auto ret = ostd::appender<std::string>();
-        auto app = ostd::appender<std::vector<path>>();;
-        for (cscript::util::list_parser p{cs, args[0].get_strr()}; p.parse();) {
-            fs::glob_match(app, p.get_item());
+        auto app = ostd::appender<std::vector<path>>();
+        list_parser p{cs, args[0].get_strr()};
+        for (auto ps: p.iter()) {
+            fs::glob_match(app, ps);
         }
-        ostd::format(ret, "%(%s %)", app.get());
-        res.set_str(std::move(ret.get()));
+        res.set_str(ostd::format(
+            ostd::appender<std::string>(), "%(%s %)", app.get()
+        ).get());
     });
 }
 

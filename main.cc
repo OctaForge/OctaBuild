@@ -11,6 +11,7 @@
 #include <ostd/argparse.hh>
 
 #include <ostd/build/make.hh>
+#include <ostd/build/make_coroutine.hh>
 
 #include <cubescript/cubescript.hh>
 
@@ -26,16 +27,17 @@ static void rule_add(
     build::make_rule::body_func bodyf{};
     if (!body.empty()) {
         bodyf = [body, &cs](auto tgt, auto srcs) {
-            cs::alias_local target{cs, cs.new_ident("target")};
-            cs::alias_local source{cs, cs.new_ident("source")};
-            cs::alias_local sources{cs, cs.new_ident("sources")};
+            auto ts = cs.new_thread();
+            cs::alias_local target{ts, ts.new_ident("target")};
+            cs::alias_local source{ts, ts.new_ident("source")};
+            cs::alias_local sources{ts, ts.new_ident("sources")};
             if (!target) {
                 throw build::make_error{
                     "internal error: could not set alias 'target'"
                 };
             }
 
-            cs::any_value idv{cs};
+            cs::any_value idv{ts};
             idv.set_str(tgt);
             target.set(std::move(idv));
 
@@ -61,7 +63,7 @@ static void rule_add(
             }
 
             try {
-                cs.run(body);
+                ts.run(body);
             } catch (cs::error const &e) {
                 throw build::make_error{e.what()};
             }
@@ -260,8 +262,8 @@ void do_main(int argc, char **argv) {
         };
     }
 
-    /* init buildsystem, use simple tasks, cubescript cannot into coroutines */
-    build::make mk{build::make_task_simple, jobs};
+    /* init buildsystem, use coroutine tasks */
+    build::make mk{build::make_task_coroutine, jobs};
 
     /* octabuild cubescript libs */
     init_rulelib(s, mk);

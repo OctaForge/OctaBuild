@@ -28,42 +28,27 @@ static void rule_add(
     if (!body.empty()) {
         bodyf = [body, &cs](auto tgt, auto srcs) {
             auto ts = cs.new_thread();
-            cs::alias_local target{ts, ts.new_ident("target")};
-            cs::alias_local source{ts, ts.new_ident("source")};
-            cs::alias_local sources{ts, ts.new_ident("sources")};
-            if (!target) {
-                throw build::make_error{
-                    "internal error: could not set alias 'target'"
-                };
-            }
+            cs::alias_local target{ts, "target"};
+            cs::alias_local source{ts, "source"};
+            cs::alias_local sources{ts, "sources"};
 
-            cs::any_value idv{ts};
-            idv.set_str(tgt);
+            cs::any_value idv{};
+            idv.set_string(tgt, ts);
             target.set(std::move(idv));
 
             if (!srcs.empty()) {
-                if (!source) {
-                    throw build::make_error{
-                        "internal error: could not set alias 'source'"
-                    };
-                }
-                if (!sources) {
-                    throw build::make_error{
-                        "internal error: could not set alias 'sources'"
-                    };
-                }
 
-                idv.set_str(srcs[0]);
+                idv.set_string(srcs[0], ts);
                 source.set(std::move(idv));
 
                 auto dsv = ostd::appender<std::string>();
                 ostd::format(dsv, "%(%s %)", srcs);
-                idv.set_str(dsv.get());
+                idv.set_string(dsv.get(), cs);
                 sources.set(std::move(idv));
             }
 
             try {
-                ts.run(body);
+                body.call(ts);
             } catch (cs::error const &e) {
                 throw build::make_error{e.what()};
             }
@@ -82,58 +67,66 @@ static void rule_add(
 }
 
 static void init_rulelib(cs::state &s, build::make &mk) {
-    s.new_command("rule", "sse", [&mk](auto &css, auto args, auto &) {
+    s.new_command("rule", "ssb", [&mk](auto &css, auto args, auto &) {
         rule_add(
-            css, mk, args[0].get_str(), args[1].get_str(), args[2].get_code()
+            css, mk, args[0].get_string(css),
+            args[1].get_string(css), args[2].get_code()
         );
     });
 
-    s.new_command("action", "se", [&mk](auto &css, auto args, auto &) {
+    s.new_command("action", "sb", [&mk](auto &css, auto args, auto &) {
         rule_add(
-            css, mk, args[0].get_str(), std::string_view{},
+            css, mk, args[0].get_string(css), std::string_view{},
             args[1].get_code(), true
         );
     });
 
     s.new_command("depend", "ss", [&mk](auto &css, auto args, auto &) {
-        rule_add(css, mk, args[0].get_str(), args[1].get_str(), nullptr);
+        rule_add(
+            css, mk, args[0].get_string(css), args[1].get_string(css),
+            cs::bcode_ref{}
+        );
     });
 }
 
 static void init_baselib(cs::state &s, build::make &mk, bool ignore_env) {
-    s.new_command("echo", "C", [](auto &, auto args, auto &) {
-        ostd::writeln(std::string_view{args[0].get_str()});
+    s.new_command("echo", "...", [](auto &css, auto args, auto &) {
+        ostd::writeln(cs::concat_values(css, args, " ").view());
     });
 
-    s.new_command("shell", "C", [&mk](auto &, auto args, auto &) {
-        mk.push_task([ds = std::string(std::string_view{args[0].get_str()})]() {
+    s.new_command("shell", "...", [&mk](auto &css, auto args, auto &) {
+        mk.push_task([
+            ds = std::string{cs::concat_values(css, args, " ").view()}
+        ]() {
             if (system(ds.data())) {
                 throw build::make_error{""};
             }
         });
     });
 
-    s.new_command("getenv", "ss", [ignore_env](auto &, auto args, auto &res) {
+    s.new_command("getenv", "ss", [ignore_env](auto &css, auto args, auto &res) {
         if (ignore_env) {
-            res.set_str("");
+            res.set_string("", css);
             return;
         }
-        res.set_str(ostd::env_get(std::string_view{args[0].get_str()}).value_or(
-            std::string{std::string_view{args[1].get_str()}}
-        ));
+        res.set_string(ostd::env_get(
+            std::string_view{args[0].get_string(css)}
+        ).value_or(
+            std::string{std::string_view{args[1].get_string(css)}}
+        ), css);
     });
 
-    s.new_command("invoke", "s", [&mk](auto &, auto args, auto &) {
-        mk.exec(std::string_view{args[0].get_str()});
+    s.new_command("invoke", "s", [&mk](auto &css, auto args, auto &) {
+        mk.exec(std::string_view{args[0].get_string(css)});
     });
 }
 
 static void init_pathlib(cs::state &s) {
     s.new_command("extreplace", "sss", [](auto &css, auto args, auto &res) {
-        ostd::string_range oldext = std::string_view{args[1].get_str()};
-        ostd::string_range newext = std::string_view{args[2].get_str()};
+        ostd::string_range oldext = std::string_view{args[1].get_string(css)};
+        ostd::string_range newext = std::string_view{args[2].get_string(css)};
         std::string ret;
-        cs::list_parser p{css, args[0].get_str()};
+        cs::list_parser p{css, args[0].get_string(css)};
         while (p.parse()) {
             ostd::path np{std::string_view{p.get_item()}};
             if (!ret.empty()) {
@@ -143,19 +136,19 @@ static void init_pathlib(cs::state &s) {
                 (np.suffixes() == oldext) ? np.with_suffixes(newext) : np
             ).string();
         }
-        res.set_str(ret);
+        res.set_string(ret, css);
     });
 
-    s.new_command("glob", "C", [](auto &css, auto args, auto &res) {
+    s.new_command("glob", "...", [](auto &css, auto args, auto &res) {
         auto app = ostd::appender<std::vector<ostd::path>>();
-        cs::list_parser p{css, args[0].get_str()};
+        cs::list_parser p{css, cs::concat_values(css, args, " ")};
         while (p.parse()) {
             auto it = p.get_item();
             fs::glob_match(app, std::string_view{it});
         }
-        res.set_str(ostd::format(
+        res.set_string(ostd::format(
             ostd::appender<std::string>(), "%(%s %)", app.get()
-        ).get());
+        ).get(), css);
     });
 }
 
@@ -180,14 +173,14 @@ static bool do_run_file(cs::state &s, std::string_view fname) {
 
     buf[len] = '\0';
 
-    s.run(std::string_view{buf.get(), std::size_t(len)}, fname);
+    s.compile(std::string_view{buf.get(), std::size_t(len)}, fname).call(s);
     return true;
 }
 
 void do_main(int argc, char **argv) {
     /* cubescript interpreter */
     cs::state s;
-    s.init_libs();
+    cs::std_init_all(s);
 
     /* arg values */
     std::string action  = "default";
@@ -248,8 +241,8 @@ void do_main(int argc, char **argv) {
     jobs = std::max(1, jobs ? jobs : ncpus);
 
     /* core cubescript variables */
-    s.new_ivar("numcpus", ncpus, true);
-    s.new_ivar("numjobs", jobs, true);
+    s.new_var("numcpus", ncpus, true);
+    s.new_var("numjobs", jobs, true);
 
     /* switch to target directory */
     try {
@@ -272,7 +265,7 @@ void do_main(int argc, char **argv) {
 
     /* parse rules */
     if ((
-        !fcont.empty() && !s.run(fcont).get_bool()
+        !fcont.empty() && !s.compile(fcont).call(s).get_bool()
     ) || !do_run_file(s, deffile)) {
         throw build::make_error{"failed creating rules"};
     }
